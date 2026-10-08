@@ -1,0 +1,13 @@
+{
+  "name": "대한민국 인생게임",
+  "short_name": "인생게임",
+  "description": "태어나는 것은 랜덤, 살아가는 것은 선택, 결과는 현실과 운이 결정하는 대한민국 인생 시뮬레이션.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16131f",
+  "theme_color": "#16131f",
+  "lang": "ko",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

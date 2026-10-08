@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#16131f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="인생게임">
+  <meta name="description" content="태어나는 것은 랜덤, 살아가는 것은 선택, 결과는 현실과 운이 결정하는 대한민국 인생 시뮬레이션.">
+  <meta property="og:title" content="대한민국 인생게임">
+  <meta property="og:description" content="태어나는 것은 랜덤, 살아가는 것은 선택. 10분 만에 한 사람의 인생을 살아 보세요.">
+  <title>대한민국 인생게임</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="app" data-stage="baby">
+    <div class="sky" aria-hidden="true"><div class="sky-glow"></div></div>
+
+    <!-- 타이틀 -->
+    <section id="scr-title" class="screen active" aria-label="시작">
+      <div class="title-wrap">
+        <p class="eyebrow">대한민국</p>
+        <h1 class="logo">인생<br>게임</h1>
+        <p class="tagline">태어나는 것은 랜덤,<br>살아가는 것은 선택.</p>
+      </div>
+      <div class="title-bottom">
+        <button id="btn-continue" class="btn btn-ghost hidden" type="button"></button>
+        <p class="ask">당신은 태어났다.<br><strong>당신의 성별은?</strong></p>
+        <div class="gender-row">
+          <button class="btn btn-gender" data-gender="M" type="button"><span class="g-ico">♂</span>남성</button>
+          <button class="btn btn-gender" data-gender="F" type="button"><span class="g-ico">♀</span>여성</button>
+        </div>
+        <p id="past-lives" class="past-lives"></p>
+      </div>
+    </section>
+
+    <!-- 출생 공개 -->
+    <section id="scr-birth" class="screen" aria-label="출생">
+      <div class="birth-scroll" id="birth-body"></div>
+      <div class="birth-foot">
+        <button id="btn-start-life" class="btn btn-primary" type="button" disabled>인생을 시작한다</button>
+      </div>
+    </section>
+
+    <!-- 플레이 -->
+    <section id="scr-play" class="screen" aria-label="인생">
+      <header class="hud">
+        <div class="hud-top">
+          <div class="age-block">
+            <span id="hud-age" class="age-num">0</span><span class="age-unit">세</span>
+          </div>
+          <div class="hud-meta">
+            <span id="hud-name" class="hud-name"></span>
+            <span id="hud-year" class="hud-year"></span>
+          </div>
+          <div class="hud-ctrl">
+            <button id="btn-speed" class="chip-btn" type="button" aria-label="속도">1×</button>
+            <button id="btn-pause" class="chip-btn" type="button" aria-label="일시정지">❚❚</button>
+          </div>
+        </div>
+        <div class="life-bar" aria-hidden="true"><div id="life-fill" class="life-fill"></div><div id="life-dot" class="life-dot"></div></div>
+      </header>
+
+      <div class="now-card">
+        <p id="now-headline" class="now-headline"></p>
+        <div class="now-tags">
+          <span class="tag" id="tag-job"></span>
+          <span class="tag" id="tag-home"></span>
+          <span class="tag" id="tag-love"></span>
+        </div>
+      </div>
+
+      <div id="feed" class="feed" aria-live="polite"></div>
+
+      <div class="statbar">
+        <div class="st"><span class="st-ico">💰</span><span id="st-money" class="st-val"></span></div>
+        <div class="st"><span class="st-ico">❤️</span><span id="st-health" class="st-val"></span></div>
+        <div class="st"><span class="st-ico">😊</span><span id="st-happy" class="st-val"></span></div>
+        <div class="st"><span class="st-ico">🤝</span><span id="st-rel" class="st-val"></span></div>
+      </div>
+
+      <nav class="tabbar">
+        <button class="tab active" data-tab="life" type="button"><span>🌱</span>인생</button>
+        <button class="tab" data-tab="people" type="button"><span>👥</span>사람</button>
+        <button class="tab" data-tab="status" type="button"><span>📋</span>상태</button>
+        <button class="tab" data-tab="log" type="button"><span>📜</span>기록</button>
+      </nav>
+    </section>
+
+    <!-- 결과 -->
+    <section id="scr-end" class="screen" aria-label="인생 결과">
+      <div class="end-scroll" id="end-body"></div>
+    </section>
+
+    <!-- 이벤트 오버레이 -->
+    <div id="event" class="event-layer hidden" role="dialog" aria-modal="true">
+      <div class="event-card" id="event-card"></div>
+    </div>
+
+    <!-- 바텀 시트 -->
+    <div id="sheet" class="sheet-layer hidden">
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet" role="dialog" aria-modal="true">
+        <div class="sheet-handle" data-close></div>
+        <div class="sheet-body" id="sheet-body"></div>
+      </div>
+    </div>
+
+    <!-- 사망 연출 -->
+    <div id="fade" class="fade-layer hidden"><p id="fade-text"></p></div>
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <!-- 데이터 -->
+  <script src="data/names.js"></script>
+  <script src="data/regions.js"></script>
+  <script src="data/jobs.js"></script>
+  <script src="data/talents.js"></script>
+  <script src="data/traits.js"></script>
+  <script src="data/flavor.js"></script>
+  <script src="data/endings.js"></script>
+  <script src="data/events-early.js"></script>
+  <script src="data/events-adult.js"></script>
+  <script src="data/events-later.js"></script>
+  <!-- 엔진 -->
+  <script src="js/rng.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/relationship.js"></script>
+  <script src="js/birth.js"></script>
+  <script src="js/probability.js"></script>
+  <script src="js/outcome.js"></script>
+  <script src="js/economy.js"></script>
+  <script src="js/health.js"></script>
+  <script src="js/life.js"></script>
+  <script src="js/timeline.js"></script>
+  <script src="js/event-engine.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/game.js"></script>
+  <!-- 화면 -->
+  <script src="js/ui.js"></script>
+</body>
+</html>
