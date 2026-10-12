@@ -12,7 +12,7 @@
     const gr = J.growth * 0.8;
     const g = Math.pow(1 + gr, Math.min(yrs, 15)) * Math.pow(1 + gr / 3, Math.max(0, yrs - 15));
     const abroad = p.liveIn === 'abroad' ? 1.3 : 1; // 해외 임금 수준
-    return Math.round(J.income * g * (0.8 + p.job.perf / 250) * (p.job.mul || 1) * abroad);
+    return Math.round(J.income * g * (0.8 + p.job.perf / 250) * (p.job.mul || 1) * abroad * (LG.Style ? LG.Style.income(p) : 1));
   }
 
   // 직업별 연봉 배수 상한 (고정급 직업은 승진·이직을 거듭해도 한계가 있다)
@@ -33,7 +33,7 @@
     const kids = LG.Rel.all(p, 'child');
     const sp = LG.Rel.get(p, 'spouse');
     const reg = S().liveRegion(p);
-    const L = reg.living;
+    const L = reg.living * (typeof window.__K === 'number' ? window.__K : 1.2);
 
     // 변동 소득 직업: 해마다 출렁인다
     if (p.job) {
@@ -60,7 +60,8 @@
     const tax = x => x * 0.11 + Math.max(0, x - 5000) * 0.14 + Math.max(0, x - 10000) * 0.12;
     let cost = tax(p.status === 'retired' ? 0 : salary(p)) + (sp && sp.job ? tax(sp.income) : 0);
     let fixedFamily = 0; // 가족 필수비용 (재량 지출보다 먼저 나간다)
-    const living = U().clamp(600 + income * 0.35, 900, 1900) * L; // 버는 만큼 아껴 산다
+    const SM = LG.Style ? LG.Style.mod(p) : { cost: 1, extra: 0 };
+    const living = U().clamp(600 + income * 0.35, 900, 1900) * L * SM.cost; // 버는 만큼 아껴 산다
     if (p.home === 'parents') cost += p.job ? living * 0.6 : 120;
     else if (p.home === 'barracks') cost += 0;
     else cost += living;
@@ -70,7 +71,7 @@
       if (c.age >= 8 && c.age <= 18 && S().has(p, 'kid_hagwon')) fixedFamily += 450;
       if (c.age >= 8 && c.age <= 18 && S().has(p, 'kid_arts')) fixedFamily += 300;
     });
-    cost += fixedFamily + Math.max(0, income - 2500 - fixedFamily) * 0.4;
+    cost += fixedFamily + Math.max(0, income - 2500 - fixedFamily) * 0.52 * SM.cost + (p.job || p.status === 'retired' ? income * SM.extra : 0);
     // 주거비
     if (!p.house && (p.home === 'rent' || p.home === 'abroad')) {
       let rent = reg.rent * ((!p.urban && !p.liveIn) ? 0.6 : 1) * U().clamp(0.45 + income / 8000, 0.45, 1);
@@ -86,6 +87,8 @@
       if (mine > 0) { p.debt += mine; if (!S().has(p, 'student_loan')) { S().flag(p, 'student_loan'); lines.push({ t: `등록금 일부를 학자금 대출로 메웠다.`, icon: '🏦' }); } }
       cost += p.home === 'parents' ? 0 : 400 * L; // 자취/기숙사 생활비
     }
+    // 어려운 집안의 짐: 부모 세대의 빚·병원비·생활비를 일부 떠안는다 (부모님이 살아 계신 동안)
+    if (p.age >= 22 && p.age <= 58 && p.job && LG.Rel.parents(p).length) cost += { 1: 300, 2: 130 }[p.family.tier] || 0;
     if (S().has(p, 'supporting_parents') && LG.Rel.parents(p).length) cost += 600;
     if (p.stats.health < 40) cost += 250 + (40 - p.stats.health) * 8;
     if (p.status === 'retired' || p.age >= 70) cost *= 0.9;
@@ -107,11 +110,12 @@
       const repay = Math.min(p.debt, Math.max(0, p.money), Math.round(p.debt * 0.1 + 150));
       p.money -= repay; p.debt -= repay;
     }
+    if (p.money < 0 && LG.Invest) LG.Invest.raise(p, -p.money);
     if (p.money < 0) {
       p.debt += -p.money; p.money = 0;
       if (!p.cool.debtMsg || p.cool.debtMsg <= p.age) {
         lines.push({ t: '통장 잔고가 바닥났다. 빚으로 생활비를 메우는 중이다.', icon: '💸' });
-        p.cool.debtMsg = p.age + 4;
+        p.cool.debtMsg = p.age + 9;
       }
     }
     // 집값

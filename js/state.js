@@ -87,7 +87,9 @@
         intents: {}, choices: 0, outcomes: { success: 0, partial: 0, fail: 0 },
         achv: 0, exp: 0,
         avg: { n: 0, health: 0, happy: 0, rel: 0 },
-        history: [], headline: '', pending: null
+        history: [], headline: '', pending: null,
+        inv: { deposit: 0, stock: 0, crypto: 0 }, invPolicy: null, mkt: null, invLast: null, catLast: {},
+        style: null, styleSince: 0, styleChosen: false, styleYears: {}, styleLog: [], cross: []
       };
     },
 
@@ -102,7 +104,33 @@
       else p.stats[k] = U.clamp(p.stats[k] + d, 1, 100);
     },
 
-    netWorth(p) { return p.money + (p.house ? p.house.value : 0) - p.debt; },
+    netWorth(p) { return p.money + (p.inv ? p.inv.deposit + p.inv.stock + p.inv.crypto : 0) + (p.house ? p.house.value : 0) - p.debt; },
+
+    // 예전 세이브에 새 필드를 채워 넣는다
+    migrate(p) {
+      if (!p) return p;
+      p.inv = p.inv || { deposit: 0, stock: 0, crypto: 0 };
+      if (p.invPolicy === undefined) p.invPolicy = null;
+      if (p.invLast === undefined) p.invLast = null;
+      p.catLast = p.catLast || {};
+      p.mkt = p.mkt || null;
+      if (p.style === undefined) p.style = null;
+      p.styleSince = p.styleSince || 0; p.styleChosen = !!p.styleChosen; p.styleYears = p.styleYears || {}; p.styleLog = p.styleLog || []; p.cross = p.cross || [];
+      return p;
+    },
+
+    MAJOR_NAME: { it: '공학·컴퓨터', biz: '경영·인문사회', med: '의학', nursing: '간호', edu: '교육', arts: '예술·디자인', sci: '자연과학', pe: '체육·스포츠', music: '음악', agri: '농생명·환경', welfare: '사회복지', lang: '어문·국제' },
+
+    eduLabel(p) {
+      const m = p.major ? State.MAJOR_NAME[p.major] || '' : '';
+      if (p.college) return (m ? m + ' ' : '') + '재학';
+      if (p.edu === 'grad') return (m ? m + ' ' : '') + '대학원 졸업';
+      if (p.edu === 'college') return (m ? m + ' ' : '') + '대졸';
+      if (p.status === 'retake') return '재수생';
+      return { none: '미취학', elem: '초등학생', middle: '중학생', high: p.age >= 19 ? '고졸' : (p.track === 'vocational' ? '특성화고' : p.track === 'sports' ? '체육 특기생' : p.track === 'arts' ? '예술고' : '고등학생') }[p.edu] || '—';
+    },
+    // 월 수입(가계 기준, 만원)
+    monthlyIncome(p) { return p.lastIncome != null && p.age >= 19 ? Math.round(p.lastIncome / 12) : 0; },
 
     // 현재 거주 지역 (이주하면 바뀜)
     liveRegion(p) { return LG.DATA.regions[p.liveIn || p.region]; },

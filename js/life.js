@@ -37,7 +37,7 @@
     // 성인이 되면 부모님이 형편껏 보태 주신다
     if (a === 20 && !S().has(p, 'seed_money')) {
       S().flag(p, 'seed_money');
-      const gift = { 1: 0, 2: 100, 3: 400, 4: 1500, 5: 4000 }[p.family.tier] * U().clamp(S().supportScore(p) / 60, 0.4, 1.3);
+      const gift = { 1: 0, 2: 100, 3: 500, 4: 2500, 5: 7000 }[p.family.tier] * U().clamp(S().supportScore(p) / 60, 0.4, 1.3);
       if (gift >= 100) { p.money += Math.round(gift / 10) * 10; lines.push({ t: `부모님이 사회 초년생 통장에 ${U().money(gift)}원을 넣어 주셨다.`, icon: '🎁' }); }
     }
 
@@ -123,12 +123,15 @@
     S().addStat(p, 'social', E.social * g);
     S().addStat(p, 'mental', (E.work + E.health) * g * 0.4);
 
+    if (LG.Style) p.stress = U().clamp(p.stress + LG.Style.stressShift(p) * 0.35, 0, 100); // 삶의 방식이 만드는 긴장/여유
+
     // 기분: 매년 '기준점' 쪽으로 천천히 수렴 (이벤트 효과는 단기, 플래그·관계는 장기)
     let target = 52;
     p.traits.forEach(t => { target += LG.DATA.traits[t].mood || 0; });
     target += (S().relScore(p) - 50) * 0.3;
     target += (p.stats.health - 60) * 0.15;
     target -= Math.max(0, p.stress - 35) * 0.35;
+    if (LG.Style) target += LG.Style.moodShift(p);
     if (a >= 22) {
       const nw = S().netWorth(p);
       target += nw < 0 ? -8 : Math.min(8, Math.log10(1 + nw / 1000) * 5) - 2;

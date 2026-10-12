@@ -22,17 +22,54 @@
     return out;
   }
 
+  // 점수가 가운데로 몰리지 않도록, 중앙값 주변을 늘려 사람마다 다른 모양이 나오게 한다
+  const spread = (x, mid, k, to) => U().clamp((to || mid) + (x - mid) * k, 0, 100);
   function scores(p) {
     const nw = S().netWorth(p);
     const money = nw <= 0 ? Math.max(5, 22 + nw / 2000) : 30 + Math.log10(1 + nw / 1000) * 21;
+    const hp = p.avg.happy * 0.7 + p.happy * 0.3, hl = p.avg.health * 0.6 + p.stats.health * 0.4, rl = p.avg.rel * 0.5 + S().relScore(p) * 0.5;
     return {
       money: Math.round(U().clamp(money, 0, 100)),
-      health: Math.round(U().clamp(p.avg.health * 0.6 + p.stats.health * 0.4, 0, 100)),
-      happy: Math.round(U().clamp(p.avg.happy * 0.7 + p.happy * 0.3, 0, 100)),
-      rel: Math.round(U().clamp(p.avg.rel * 0.5 + S().relScore(p) * 0.5, 0, 100)),
-      achv: Math.round(U().clamp(p.achv * 1.05, 0, 100)),
-      exp: Math.round(U().clamp(15 + p.exp * 1.8, 0, 100))
+      health: Math.round(spread(hl, 46, 1.5, 50)),
+      happy: Math.round(spread(hp, 55, 1.7)),
+      rel: Math.round(spread(rl, 53, 1.6)),
+      achv: Math.round(spread(p.achv * 1.05, 49, 1.35)),
+      exp: Math.round(spread(15 + p.exp * 1.8, 46, 1.4))
     };
+  }
+  // 인생 종합 — 돈은 일부일 뿐. 행복 · 관계 · 건강 · 성취가 함께 본다
+  function total(s) { return Math.round(s.happy * 0.3 + s.rel * 0.2 + s.health * 0.15 + s.achv * 0.12 + s.money * 0.15 + s.exp * 0.08); }
+  const GRADES = [[72, '충만한 인생'], [60, '만족스러운 인생'], [49, '무난한 인생'], [38, '아쉬움이 남는 인생'], [0, '고단했던 인생']];
+  const grade = t => GRADES.find(g => t >= g[0])[1];
+
+  // 가장 큰 갈림길 n개 (시기가 겹치지 않게)
+  function crossroads(p, n) {
+    const list = (p.cross || []).slice().sort((a, b) => b.w - a.w);
+    const out = [];
+    list.forEach(x => { if (out.length < n && out.every(o => Math.abs(o.a - x.a) >= 4)) out.push(x); });
+    list.forEach(x => { if (out.length < n && out.indexOf(x) < 0) out.push(x); });
+    return out.sort((a, b) => a.a - b.a);
+  }
+
+  // 지금까지의 선택이 만든 성향 — 어떤 선택을 거듭해 왔는가
+  const TEND = [
+    { k: 'bold', name: '도전형', icon: '🎲', w: { risk: 1.4, adventure: 1.2 } },
+    { k: 'steady', name: '안정추구형', icon: '🛡️', w: { stability: 1.2, money: 0.3 } },
+    { k: 'driven', name: '성취형', icon: '🏆', w: { career: 1.3, money: 0.7 } },
+    { k: 'bonds', name: '관계중심형', icon: '🤝', w: { family: 1.2, love: 1.1, social: 1 } },
+    { k: 'learner', name: '배움형', icon: '📖', w: { education: 1.3 } },
+    { k: 'carer', name: '자기관리형', icon: '🌿', w: { health: 1.3 } },
+    { k: 'free', name: '자유로운 영혼', icon: '🕊️', w: { rest: 1, hobby: 1.2, independence: 1.1 } }
+  ];
+  function tendency(p, min) {
+    const total = Object.keys(p.intents).reduce((a, k) => a + p.intents[k], 0);
+    if (total < (min || 6)) return null;
+    let best = null;
+    TEND.forEach(t => {
+      const sc = Object.keys(t.w).reduce((a, k) => a + (p.intents[k] || 0) * t.w[k], 0) / total;
+      if (!best || sc > best.sc) best = { sc, t };
+    });
+    return best && best.sc >= 0.22 ? best.t : null;
   }
 
   // 가장 오래 한 일 = 그 사람의 직업
@@ -51,7 +88,9 @@
 
   function ending(p) {
     const s = scores(p);
-    const title = LG.DATA.endingTitles.find(x => x.if(s, p)).t;
+    const c = { dom: LG.Style ? LG.Style.dominant(p) : null, tend: tendency(p, 8) };
+    const title = LG.DATA.endingTitles.find(x => x.if(s, p, c)).t;
+    const tot = total(s);
     const best = LG.DATA.oneLiners.map(o => ({ t: o.t, sc: o.score(p, s) })).sort((a, b) => b.sc - a.sc)[0];
     const topIntent = Object.keys(p.intents).sort((a, b) => p.intents[b] - p.intents[a])[0];
     const values = topIntent ? '당신은 ' + LG.DATA.valueText[topIntent] : '당신은 흘러가는 대로 살았습니다.';
@@ -65,12 +104,13 @@
     const spouse = p.people.find(n => n.role === 'spouse');
     const lastJob = mainJob(p);
     return {
-      s, title, oneLiner: best.t, values, luck,
+      s, title, oneLiner: best.t, values, luck, total: tot, grade: grade(tot),
+      dom: c.dom ? LG.Style.STYLES[c.dom] : null, tend: c.tend, cross: crossroads(p, 3),
       age: p.age, job: lastJob, kids,
       spouse: spouse ? (spouse.alive ? '있음' : '사별') : p.flags.divorced ? '이혼' : '없음',
       net: S().netWorth(p), choices: p.choices, outcomes: p.outcomes
     };
   }
 
-  LG.Timeline = { add, highlights, scores, ending, mainJob };
+  LG.Timeline = { add, highlights, scores, ending, mainJob, tendency, TEND, total, grade, crossroads };
 })(window.LG = window.LG || {});

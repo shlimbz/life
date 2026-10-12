@@ -9,7 +9,7 @@
     save(p) { safe(() => localStorage.setItem(KEY, JSON.stringify(p))); },
     load() {
       const p = safe(() => JSON.parse(localStorage.getItem(KEY) || 'null'), null);
-      return p && p.v === 1 ? p : null;
+      return p && p.v === 1 ? LG.State.migrate(p) : null;
     },
     clear() { safe(() => localStorage.removeItem(KEY)); },
     archive(summary) {

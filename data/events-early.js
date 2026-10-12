@@ -55,21 +55,21 @@
       { id: 'study', label: '학원에 다니며 공부한다', intent: 'education',
         check: { base: 52, partial: 0.5, f: [['family', 0.6], ['region', 'edu', 0.25], ['stat', 'intelligence', 0.25], ['support', 0.2]] },
         out: {
-          success: { t: '공부하는 습관이 몸에 붙었다. 받아쓰기 100점을 받아 왔다.', log: '학원에 다니며 공부 습관을 들임', eff: { study: 32 }, st: { intelligence: 3 }, fn: disc('math', 'language', 'writing') },
+          success: { t: '공부하는 습관이 몸에 붙었다. 받아쓰기 100점을 받아 왔다.', log: '학원에 다니며 공부 습관을 들임', eff: { study: 32 }, flag: 'kid_study', st: { intelligence: 3 }, fn: disc('math', 'language', 'writing') },
           partial: { t: '학원은 다니지만 마음은 놀이터에 가 있다.', eff: { study: 16 }, sr: 6 },
           fail: { t: '학원비가 부담스러워 몇 달 만에 그만뒀다.', log: '형편 때문에 학원을 그만둠', eff: { study: 8 }, hp: -4 }
         } },
       { id: 'sport', label: '태권도·축구 교실에 다닌다', intent: 'health',
         check: { base: 62, partial: 0.5, f: [['stat', 'physical', 0.35], ['talent', 'sport', 14], ['family', 0.3]] },
         out: {
-          success: { t: '땀 흘리는 게 즐겁다. 관장님이 소질이 있다고 하셨다.', log: '운동을 시작함', eff: { sport: 32 }, st: { physical: 5, health: 3 }, fn: disc('sport') },
+          success: { t: '땀 흘리는 게 즐겁다. 관장님이 소질이 있다고 하셨다.', log: '운동을 시작함', eff: { sport: 32 }, flag: 'kid_sport', st: { physical: 5, health: 3 }, fn: disc('sport') },
           partial: { t: '친구들 따라 다니는 정도. 그래도 체력은 좋아졌다.', eff: { sport: 16 }, st: { health: 2 } },
           fail: { t: '첫날부터 넘어져 무릎이 까졌다. 운동은 나랑 안 맞나 보다.', eff: { sport: 6 }, hp: -3 }
         } },
       { id: 'art', label: '그림이나 피아노를 배운다', intent: 'hobby',
         check: { base: 55, partial: 0.5, f: [['stat', 'creativity', 0.35], ['talent', 'art', 12], ['talent', 'music', 12], ['family', 0.45], ['region', 'culture', 0.15]] },
         out: {
-          success: { t: '시간 가는 줄 모르고 몰두했다. 학원 선생님이 대회에 나가 보자고 하셨다.', log: '그림·음악을 배우기 시작함', eff: { art: 32 }, st: { creativity: 5 }, fn: disc('art', 'music') },
+          success: { t: '시간 가는 줄 모르고 몰두했다. 학원 선생님이 대회에 나가 보자고 하셨다.', log: '그림·음악을 배우기 시작함', eff: { art: 32 }, flag: 'kid_art', st: { creativity: 5 }, fn: disc('art', 'music') },
           partial: { t: '재미는 있지만 연습은 늘 귀찮다.', eff: { art: 16 }, st: { creativity: 2 } },
           fail: { t: '레슨비가 만만치 않았다. 결국 집에서 혼자 끄적이게 됐다.', eff: { art: 8 } }
         } },
@@ -382,8 +382,9 @@
     label: '인생의 갈림길', title: '고등학교 졸업',
     text: p => p.track === 'vocational' ? '졸업장을 받았다. 친구들은 취업을 하거나 대학에 간다. 나는?' : '수능이 끝났다. 성적표를 받아 든 손이 떨린다. 이제 어디로 갈 것인가?',
     wait: '합격자 발표를 기다리는 중',
+    maxShow: 5,
     choices: [
-      { id: 'univ', label: '대학에 진학한다', intent: 'education',
+      { id: 'univ', label: '대학에 진학한다', intent: 'education', must: true,
         check: { base: 40, partial: 0.5, f: [
           ['stat', 'intelligence', 0.42], ['eff', 'study', 0.3], ['flag', 'studied_hard', 10, '학창 시절의 노력'], ['eduEnv', 0.35],
           ['family', 0.45], ['support', 0.15], ['stress', 0.15], ['flag', 'vocational', -12, '특성화고 교육과정'], ['flag', 'helped_family', -4, '집안일로 줄어든 공부 시간']] },
@@ -392,17 +393,32 @@
           partial: { t: '원하던 곳은 아니지만, 대학에 붙었다.', log: '대학 진학 (목표보다 낮은 학교)', hp: 3, achv: 2, flag: ['college', 'lower_college'], fn: H.college(4), next: 'u_major' },
           fail: { t: p => p.family.tier <= 2 ? '성적도, 형편도 따라주지 않았다. 불합격 통지를 받았다.' : '불합격. 모든 게 끝난 것만 같았다.', log: '대학 진학 실패', hp: -12, sr: 12, flag: 'college_failed', status: 'seeking', next: 'u_after_fail' }
         } },
-      { id: 'work', label: '바로 취업한다', intent: 'career',
+      { id: 'work', label: '바로 취업한다', intent: 'career', must: true,
         out: { t: '남들보다 먼저 사회에 나가기로 했다.', log: '대학 대신 사회로', status: 'seeking', flag: 'no_college', next: 'w_first_job' } },
-      { id: 'retake', label: '1년 더 준비한다 (재수)', intent: 'education', if: p => p.track !== 'vocational',
+      { id: 'retake', label: '1년 더 준비한다 (재수)', intent: 'education', rank: 35, if: p => p.track !== 'vocational',
         out: { t: '한 해만 더. 독서실 생활이 다시 시작됐다.', log: '재수 결심', status: 'retake', eff: { study: 22 }, sr: 10, queue: [{ id: 't_retry', in: 1 }] } },
-      { id: 'pro', label: '프로 입단에 도전한다', intent: 'adventure', if: p => has(p, 'athlete_path'),
+      { id: 'pro', label: '프로 입단에 도전한다', intent: 'adventure', rank: 90, if: p => has(p, 'athlete_path'),
         check: { base: 35, partial: 0, f: [['stat', 'physical', 0.55], ['eff', 'sport', 0.4], ['talent', 'sport', 15], ['health', 0.2]] },
         out: {
           success: { t: '드래프트에서 이름이 불렸다! 프로 선수가 되었다.', log: '프로 선수 입단', job: 'athlete', achv: 10, hp: 15, flag: 'dream_job' },
           fail: { t: '드래프트에서 끝내 이름이 불리지 않았다.', log: '프로 입단 실패', hp: -14, status: 'seeking', next: 'u_after_fail' }
         } },
-      { id: 'arts', label: '예술대학에 도전한다', intent: 'hobby', if: p => p.track === 'arts' || p.effort.art >= 25,
+      { id: 'pe_univ', label: '체육대학에 실기로 도전한다', intent: 'adventure', rank: p => 40 + LG.Aff.get(p, 'sports'),
+        if: p => p.track === 'sports' || has(p, 'sports_hs') || LG.Aff.get(p, 'sports') >= 45,
+        check: { base: 46, partial: 0.3, f: [['stat', 'physical', 0.45], ['eff', 'sport', 0.4], ['talent', 'sport', 12], ['flag', 'sports_hs', 12, '체육 특기생 경력'], ['flag', 'sports_injury', -12, '부상 이력'], ['family', 0.25]] },
+        out: {
+          success: { t: '체육대학 실기에 합격했다! 운동장이 곧 교실이다.', log: '체육대학 합격', major: 'pe', flag: 'college', achv: 4, hp: 12, fn: seq(H.college(4), disc('sport')), },
+          partial: { t: '원하던 학교는 아니지만 체육교육과에 붙었다.', log: '체육교육과 진학', major: 'pe', flag: ['college', 'lower_college'], hp: 4, fn: H.college(4) },
+          fail: { t: '실기에서 아쉽게 떨어졌다. 운동은 어떻게 이어 갈 수 있을까.', log: '체육대학 낙방', hp: -10, status: 'seeking', next: 'u_after_fail' }
+        } },
+      { id: 'music_univ', label: '음악대학 실기에 도전한다', intent: 'hobby', rank: p => 35 + LG.Aff.get(p, 'music'),
+        if: p => LG.Aff.get(p, 'music') >= 42 || has(p, 'band'),
+        check: { base: 36, partial: 0, f: [['stat', 'creativity', 0.4], ['eff', 'art', 0.4], ['talent', 'music', 14], ['flag', 'band', 8, '밴드·연주 경험'], ['family', 0.45]] },
+        out: {
+          success: { t: '음악대학 실기에 합격했다. 연습실 불빛이 꺼지지 않는다.', log: '음악대학 합격', major: 'music', flag: 'college', achv: 4, hp: 12, fn: seq(H.college(4), disc('music')) },
+          fail: { t: '실기 심사에서 떨어졌다. 음악을 놓을 순 없는데.', log: '음악대학 낙방', hp: -10, status: 'seeking', next: 'u_after_fail' }
+        } },
+      { id: 'arts', label: '예술대학에 도전한다', intent: 'hobby', rank: p => 30 + LG.Aff.get(p, 'art'), if: p => p.track === 'arts' || p.effort.art >= 25,
         check: { base: 38, partial: 0, f: [['stat', 'creativity', 0.45], ['eff', 'art', 0.4], ['talent', 'art', 10], ['talent', 'music', 10], ['family', 0.4]] },
         out: {
           success: { t: '예술대학에 합격했다! 작업실 냄새가 좋다.', log: '예술대학 합격', major: 'arts', flag: 'college', achv: 4, hp: 12, fn: H.college(4) },
@@ -438,27 +454,56 @@
     }
   });
 
+  // 전공 선택: 지금까지의 길(재능 · 환경 · 과거 선택)과 가까운 전공이 먼저 보인다
+  const A = (p, d) => LG.Aff.get(p, d);
   E.push({
-    id: 'u_major', cat: 'education', tier: 'major', queued: true, icon: '📚',
+    id: 'u_major', cat: 'education', tier: 'major', queued: true, icon: '📚', maxShow: 5,
     label: '대학', title: '전공 선택',
-    text: '어떤 공부를 할까? 이 선택이 첫 직장의 문을 결정할지도 모른다.',
+    text: p => {
+      const t = LG.Aff.top(p, 2).map(k => LG.Aff.DOMAINS[k].name);
+      return '어떤 공부를 할까? 이 선택이 첫 직장의 문을 결정할지도 모른다.' + (t.length ? ` 지금까지 걸어온 길을 돌아보면 ${t.join('·')} 쪽으로 마음이 기운다.` : '');
+    },
     choices: [
-      { id: 'it', label: '공학·컴퓨터', intent: 'career', out: { t: '코드와 수식의 세계로.', major: 'it', log: '공학·컴퓨터 전공', fn: disc('math', 'mechanical') } },
-      { id: 'biz', label: '경영·인문사회', intent: 'social', out: { t: '사람과 사회를 공부하기로 했다.', major: 'biz', log: '경영·인문사회 전공', fn: disc('language', 'writing', 'leadership', 'entrepreneur') } },
-      { id: 'med', label: '의대·간호대에 도전', intent: 'career',
-        check: { base: 10, partial: 0.6, max: 70, f: [['stat', 'intelligence', 0.65], ['eff', 'study', 0.4], ['flag', 'studied_hard', 10, '학창 시절의 노력'], ['eduEnv', 0.3], ['flag', 'lower_college', -15, '입시 결과']] },
+      { id: 'it', label: '공학·컴퓨터', intent: 'career', rank: p => 28 + A(p, 'tech') * 0.7 + A(p, 'science') * 0.4, out: { t: '코드와 수식의 세계로.', major: 'it', log: '공학·컴퓨터 전공', fn: disc('math', 'mechanical') } },
+      { id: 'biz', label: '경영·인문사회', intent: 'social', must: true, out: { t: '사람과 사회를 공부하기로 했다.', major: 'biz', log: '경영·인문사회 전공', fn: disc('language', 'writing', 'leadership', 'entrepreneur') } },
+      { id: 'pe', label: '체육·스포츠과학', intent: 'adventure', rank: p => 22 + A(p, 'sports') * 1.4,
+        if: p => A(p, 'sports') >= 25 || p.track === 'sports' || has(p, 'athlete_path'),
+        check: { base: 58, partial: 0.4, f: [['stat', 'physical', 0.35], ['eff', 'sport', 0.35], ['talent', 'sport', 10], ['flag', 'sports_hs', 10, '체육 특기생 경력']] },
+        out: {
+          success: { t: '운동을 학문으로 배우는 길에 들어섰다. 실기 수업이 기다려진다.', log: '체육·스포츠과학 전공', major: 'pe', flag: 'pe_major', hp: 6, fn: disc('sport') },
+          partial: { t: '체육교육과에 들어갔다. 교생 실습을 상상해 본다.', log: '체육교육 전공', major: 'pe', flag: 'pe_major' },
+          fail: { t: '실기 점수가 모자라 경영학과로 진학했다. 운동은 동아리에서라도 계속해야지.', major: 'biz', hp: -4 }
+        } },
+      { id: 'music', label: '음악·공연예술', intent: 'hobby', rank: p => 22 + A(p, 'music') * 1.2, if: p => A(p, 'music') >= 28,
+        check: { base: 48, partial: 0.2, f: [['stat', 'creativity', 0.35], ['eff', 'art', 0.3], ['talent', 'music', 12], ['flag', 'band', 8, '밴드·연주 경험']] },
+        out: {
+          success: { t: '전공 레슨실에서 하루를 보낸다. 손가락에 굳은살이 박였다.', log: '음악 전공', major: 'music', fn: disc('music') },
+          partial: { t: '실용음악과에 들어갔다. 무대는 아직 멀다.', major: 'music' },
+          fail: { t: '실기에서 떨어져 인문대로 진학했다. 음악은 취미로 이어 간다.', major: 'biz', hp: -4, flag: 'band' }
+        } },
+      { id: 'med', label: '의대·간호대에 도전', intent: 'career', rank: p => 18 + A(p, 'care') * 0.6 + A(p, 'science') * 0.4 + (p.stats.intelligence - 55) * 0.6,
+        if: p => p.stats.intelligence >= 52 || A(p, 'care') >= 35,
+        check: { base: 10, partial: 0.6, max: 70, f: [['stat', 'intelligence', 0.65], ['eff', 'study', 0.4], ['flag', 'studied_hard', 10, '학창 시절의 노력'], ['eduEnv', 0.3], ['flag', 'lower_college', -15, '입시 결과'], ['flag', 'volunteer', 6, '봉사 경험']] },
         out: {
           success: { t: '의대에 합격했다! 길고 긴 공부가 시작된다.', log: '의대 진학', major: 'med', achv: 8, hp: 10, fn: H.college(8, 'med') },
           partial: { t: '의대는 못 갔지만 간호학과에 들어갔다.', log: '간호학과 진학', major: 'nursing' },
           fail: { t: '의대의 벽은 높았다. 생명과학과로 진학했다.', log: '자연과학 전공', major: 'sci', hp: -4 }
         } },
-      { id: 'edu', label: '교대·사범대에 도전', intent: 'stability',
+      { id: 'edu', label: '교대·사범대에 도전', intent: 'stability', rank: p => 28 + A(p, 'people') * 0.5 + A(p, 'care') * 0.3,
         check: { base: 40, partial: 0, f: [['stat', 'intelligence', 0.4], ['eff', 'study', 0.3]] },
         out: {
           success: { t: '선생님이 되는 길에 들어섰다.', log: '사범대 진학', major: 'edu' },
           fail: { t: '교대는 떨어졌다. 인문대에 진학했다.', major: 'biz', hp: -3 }
         } },
-      { id: 'arts', label: '예술·디자인', intent: 'hobby',
+      { id: 'sci', label: '자연과학·수학', intent: 'education', rank: p => 22 + A(p, 'science') * 0.9, if: p => A(p, 'science') >= 38,
+        out: { t: '숫자와 자연의 법칙이 점점 더 재미있어진다.', log: '자연과학 전공', major: 'sci', fn: disc('math') } },
+      { id: 'agri', label: '농생명·환경', intent: 'stability', rank: p => 22 + A(p, 'nature') * 1.0, if: p => A(p, 'nature') >= 30,
+        out: { t: '흙과 식물, 그리고 지속가능한 삶을 공부하기로 했다.', log: '농생명·환경 전공', major: 'agri', flag: 'farm_helper' } },
+      { id: 'welfare', label: '사회복지·상담', intent: 'family', rank: p => 22 + A(p, 'care') * 0.8 + A(p, 'people') * 0.3, if: p => A(p, 'care') >= 28 || (A(p, 'people') >= 45 && p.stats.mental >= 55),
+        out: { t: '도움이 필요한 사람 곁에 서는 일을 배우기로 했다.', log: '사회복지 전공', major: 'welfare' } },
+      { id: 'lang', label: '어문·국제', intent: 'adventure', rank: p => 22 + A(p, 'global') * 1.0 + A(p, 'writing') * 0.3, if: p => A(p, 'global') >= 30 || A(p, 'writing') >= 45,
+        out: { t: '언어를 배우면 세계가 넓어진다고 믿는다.', log: '어문·국제 전공', major: 'lang', fn: disc('language', 'writing') } },
+      { id: 'arts', label: '예술·디자인', intent: 'hobby', rank: p => 18 + A(p, 'art') * 1.2, if: p => A(p, 'art') >= 22 || p.stats.creativity >= 55,
         check: { base: 48, partial: 0, f: [['stat', 'creativity', 0.4], ['eff', 'art', 0.3], ['talent', 'art', 10], ['talent', 'music', 10]] },
         out: {
           success: { t: '실기 전형에 붙었다. 하고 싶은 걸 공부한다.', log: '예술·디자인 전공', major: 'arts', fn: disc('art', 'music') },

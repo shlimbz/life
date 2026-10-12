@@ -30,6 +30,9 @@
     ceo:         { name: '사업가', icon: '📈', income: 5000, growth: 0.03, stab: 30, stress: 78, status: 82, hp: -0.5, wlb: 24, edu: 'none', vary: 0.45, achv: 2 },
     farmer:      { name: '농업인', icon: '🌾', income: 2600, growth: 0.02, stab: 50, stress: 40, status: 42, hp: 0.2, wlb: 50, edu: 'none', vary: 0.25, achv: 0.8 },
     driver:      { name: '운전기사', icon: '🚚', income: 3000, growth: 0.015, stab: 50, stress: 52, status: 36, hp: -0.4, wlb: 40, edu: 'none', vary: 0.05, achv: 0.5 },
+    socialworker:{ name: '사회복지사', icon: '🤝', income: 2800, growth: 0.03, stab: 70, stress: 62, status: 50, hp: -0.2, wlb: 48, edu: 'college', vary: 0, achv: 1 },
+    translator:  { name: '통번역가', icon: '🌐', income: 3300, growth: 0.035, stab: 40, stress: 52, status: 58, hp: -0.1, wlb: 58, edu: 'college', vary: 0.2, achv: 1.1 },
+    engineer:    { name: '엔지니어', icon: '🛠️', income: 4000, growth: 0.04, stab: 66, stress: 56, status: 60, hp: -0.2, wlb: 50, edu: 'college', vary: 0, achv: 1.1 },
     parttime:    { name: '아르바이트', icon: '🧾', income: 1700, growth: 0.01, stab: 15, stress: 48, status: 24, hp: -0.1, wlb: 50, edu: 'none', vary: 0.1, achv: 0.2 },
     homemaker:   { name: '전업주부', icon: '🏠', income: 0, growth: 0, stab: 80, stress: 45, status: 40, hp: 0, wlb: 50, edu: 'none', vary: 0, achv: 0.6 }
   };

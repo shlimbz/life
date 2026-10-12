@@ -60,6 +60,8 @@
         if (m) list.push({ label: T.name + ' 성격', v: m });
       });
     }
+    // 같은 방식을 거듭 택하면 그 방식에 익숙해진다 (숙련)
+    if (intent && (p.intents[intent] || 0) >= 4 && INTENT_LABEL[intent]) list.push({ label: INTENT_LABEL[intent] + '(익숙함)', v: Math.min(5, Math.round(p.intents[intent] * 0.35)) });
     return list;
   }
 

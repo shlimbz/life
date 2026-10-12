@@ -57,6 +57,7 @@
       const r = eff.fn(p, ctx || {});
       if (typeof r === 'string') extra += ' ' + r;
     }
+    if (p.money < 0 && LG.Invest) LG.Invest.raise(p, -p.money);
     return extra.trim();
   }
 

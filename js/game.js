@@ -22,7 +22,9 @@
         LG.Timeline.add(p, l.t, l.reflect ? 'reflect' : l.major ? 'major' : 'minor', l.icon);
       });
       push(LG.Life.yearly(p));
+      push(LG.Style.yearly(p));
       push(LG.Economy.yearly(p));
+      push(LG.Invest.yearly(p));
       push(LG.Rel.yearly(p));
       push(LG.Health.yearly(p));
 
@@ -35,10 +37,9 @@
 
       const yr = LG.Events.pickYear(p);
       yr.lines.forEach(l => lines.push(l));
-      if (!lines.length || (lines.every(l => !l.major) && LG.RNG.chance(p, 0.35))) {
-        const f = LG.Events.flavor(p);
-        if (f) lines.push(f);
-      }
+      // 잔잔한 일상 문장: 한 해에 여러 줄이 흘러갈 수 있다 (어릴수록 많이)
+      const busy = lines.filter(l => l.major).length;
+      LG.Events.flavorLines(p, busy, !!yr.event).forEach(f => lines.push(f));
       p.pending = yr.event ? yr.event.id : null;
       lines.forEach(l => { l.t = LG.U.fixJosa(l.t); });
       return { lines, event: yr.event, death: false };

@@ -143,9 +143,9 @@
     check: { base: 40, f: [['stat', 'social', 0.4], ['happy', 0.2], ['trait', 'extrovert', 6]] },
     out: { success: { t: '비 오는 날 우산을 같이 쓴 것이 인연이 되어 {partner}와(과) 만나기 시작했다.', log: '{partner}와 우연히 만나 연애 시작', major: true, hp: 10, fn: H.lover() }, fail: { skip: true } } });
 
-  auto({ id: 'a_coworker', cat: 'social', ages: [22, 60], w: 3, cd: 5, icon: '☕',
+  auto({ id: 'a_coworker', cat: 'social', ages: [22, 60], w: 3, cd: 8, max: 4, icon: '☕',
     if: p => !!p.job,
-    auto: { t: '새로 온 동료와 금방 친해졌다. 점심시간이 즐거워졌다.', hp: 3, fn: H.friend(60, '직장 동료') } });
+    auto: { t: p => LG.RNG.pick(p, ['새로 온 동료와 금방 친해졌다. 점심시간이 즐거워졌다.', '옆 부서 사람과 엘리베이터에서 말을 텄다. 이제 커피 한 잔 같이 마시는 사이다.', '프로젝트를 같이 하다 보니 동료와 가까워졌다. 퇴근 후 맥주 한 잔이 일상이 되었다.', '회식 2차에서 동료와 속 깊은 이야기를 나눴다. 이후 서로 든든한 편이 되었다.']), hp: 3, fn: H.friend(60, '직장 동료') } });
 
   auto({ id: 'a_friend_wedding', cat: 'social', ages: [26, 42], w: 3, cd: 4, icon: '💐',
     if: p => LG.Rel.all(p, 'friend').length > 0,
@@ -178,7 +178,7 @@
   auto({ id: 'a_accident', cat: 'accident', ages: [16, 85], w: 1.2, cd: 12, icon: '🚑',
     check: { base: 70, partial: 0.5, f: [['fn', p => p.age > 70 ? { label: '나이', v: -(p.age - 70) } : null]] },
     out: {
-      success: { t: '접촉 사고가 났다. 크게 다치진 않았다.', st: { health: -3 }, sr: 4 },
+      success: { t: p => LG.RNG.pick(p, ['접촉 사고가 났다. 크게 다치진 않았다.', '빗길에 미끄러져 넘어졌다. 멍이 든 정도로 끝났다.', '자전거(혹은 차)로 가다 아찔한 순간이 있었다. 다치진 않았지만 한동안 가슴이 뛰었다.']), st: { health: -3 }, sr: 4 },
       partial: { t: '빙판길에 넘어져 다리가 부러졌다. 석 달을 깁스로 지냈다.', st: { health: -8 }, money: -150 },
       fail: { t: '당신의 선택과 상관없이, 사고는 예고 없이 찾아왔다. 몇 달을 병원에서 보냈다.', log: '큰 사고를 당함', major: true, st: { health: -18 }, money: -800, hp: -10, flag: 'injured' }
     } });

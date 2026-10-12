@@ -27,7 +27,37 @@
     return 0.22;
   }
 
-  function weight(p, ev) { return typeof ev.w === 'function' ? ev.w(p) : (ev.w != null ? ev.w : 10); }
+  function baseWeight(p, ev) { return typeof ev.w === 'function' ? ev.w(p) : (ev.w != null ? ev.w : 10); }
+
+  // 같은 분야 이야기가 연달아 나오지 않도록: 최근에 나온 분류일수록 가중치를 깎는다
+  function recency(p, ev) {
+    const last = p.catLast && p.catLast[ev.cat];
+    if (last == null) return 1;
+    const d = p.age - last, strong = ev.cat === 'relationship' || ev.cat === 'friend';
+    if (d <= 1) return strong ? 0.07 : 0.22;
+    if (d <= 3) return strong ? 0.25 : 0.55;
+    if (d <= 6) return strong ? 0.55 : 0.85;
+    return 1;
+  }
+  // 내 출생 환경·재능·과거 선택과 이어진 이벤트(dom 태그)는 더 자주 찾아온다
+  // 시련 이벤트의 환경 가중치 — 어릴 땐 '자란 집'(형편·불화·보호자), 어른이 되면 '지금의 살림'(자산·실직)이 위험을 좌우한다.
+  // ev.risk(0~1)가 그 환경 영향의 세기. 가난·불화 → 최대 약 2.4배, 부유·화목 → 최소 약 0.35배.
+  function riskMult(p, ev) {
+    if (!ev.risk) return 1;
+    const tags = p.family.tags;
+    let fam = { 1: 2.0, 2: 1.45, 3: 1, 4: 0.62, 5: 0.4 }[p.family.tier] || 1;
+    const conflict = tags.indexOf('conflict') >= 0 || tags.indexOf('divorced_parents') >= 0 || p.flags.parents_divorced;
+    if (conflict) fam *= 1.35;
+    else if (tags.indexOf('single_parent') >= 0) fam *= 1.15;
+    else if (tags.indexOf('busy_parents') < 0) fam *= 0.88;   // 화목하고 보살펴 주는 집
+    const nw = LG.State.netWorth(p);
+    let eco = nw < 300 ? 1.8 : nw < 3000 ? 1.3 : nw < 15000 ? 1 : nw < 50000 ? 0.65 : 0.45;
+    if (p.status === 'seeking') eco *= 1.2;
+    const wf = p.age < 17 ? 1 : Math.max(0, 1 - (p.age - 17) / 15);
+    const raw = Math.pow(fam, wf) * Math.pow(eco, 1 - wf);
+    return Math.max(0.3, 1 + (raw - 1) * ev.risk);
+  }
+  function weight(p, ev) { return baseWeight(p, ev) * LG.Aff.mult(p, ev.dom) * recency(p, ev) * riskMult(p, ev); }
 
   function eligible(p, ev, fromQueue) {
     if (!fromQueue) {
@@ -42,7 +72,14 @@
     return true;
   }
 
-  function visibleChoices(p, ev) { return (ev.choices || []).filter(c => !c.if || c.if(p)); }
+  // 선택지: 조건에 맞는 것만. ev.maxShow 가 있으면 '지금의 나'와 가장 가까운 것(rank)을 우선해 그 수만큼만 보여 준다.
+  function visibleChoices(p, ev) {
+    const list = (ev.choices || []).filter(c => !c.if || c.if(p));
+    if (!ev.maxShow || list.length <= ev.maxShow) return list;
+    const scored = list.map((c, i) => ({ c, i, r: c.must ? 999 : (typeof c.rank === 'function' ? c.rank(p) : (c.rank != null ? c.rank : 40)) }));
+    const keep = scored.slice().sort((a, b) => b.r - a.r || a.i - b.i).slice(0, ev.maxShow).map(x => x.i).sort((a, b) => a - b);
+    return keep.map(i => list[i]);
+  }
 
   // 1년 동안 일어날 일 고르기
   function pickYear(p) {
@@ -74,11 +111,22 @@
       choiceEv = R().weighted(p, pool, e => weight(p, e));
     }
 
-    // 4. 자동 이벤트 (선택 없이 지나가는 일들)
-    if (p.age >= 1 && R().chance(p, choiceEv ? 0.22 : 0.42)) {
-      const pool = all().filter(e => e.tier === 'auto' && eligible(p, e));
-      const ev = R().weighted(p, pool, e => weight(p, e));
-      if (ev) { const l = runAuto(p, ev); if (l) lines.push(l); }
+    // 4. 자동 이벤트 (선택 없이 지나가는 일들) — 한 해에 두 건까지
+    if (p.age >= 1) {
+      const tries = [choiceEv ? 0.2 : 0.42, 0.14];
+      tries.forEach(pr => {
+        if (!R().chance(p, pr)) return;
+        const pool = all().filter(e => e.tier === 'auto' && !e.rate && eligible(p, e));
+        const ev = R().weighted(p, pool, e => weight(p, e));
+        if (ev) { const l = runAuto(p, ev); if (l) lines.push(l); }
+      });
+    }
+    // 5. 해마다 '낮은 확률'로 직접 굴리는 사건 (rate: 연 확률) — 다른 자동 이벤트의 풀 크기에 영향받지 않는다
+    if (p.age >= 1) {
+      all().filter(e => e.tier === 'auto' && e.rate && eligible(p, e)).forEach(e => {
+        const r = (typeof e.rate === 'function' ? e.rate(p) : e.rate) * riskMult(p, e);
+        if (r > 0 && R().chance(p, r)) { const l = runAuto(p, e); if (l) lines.push(l); }
+      });
     }
     return { event: choiceEv, lines };
   }
@@ -123,6 +171,22 @@
     }));
   }
 
+  // 선택의 무게 — 큰 걸 노린 선택은 이기면 크게, 지면 더 아프고, 안전한 선택은 덜 얻는 대신 덜 잃는다.
+  const STAKES = {
+    risk: { s: 2.1, f: 1.5 }, adventure: { s: 1.35, f: 1.3 }, money: { s: 1.15, f: 1.1 }, career: { s: 1.1, f: 1.05 },
+    stability: { s: 0.85, f: 0.6 }, rest: { s: 0.8, f: 0.6 }, health: { s: 1, f: 0.85 }
+  };
+  function stake(out, intent, type) {
+    const k = STAKES[intent];
+    if (!k || !out) return out;
+    const m = type === 'success' ? k.s : type === 'fail' ? k.f : (k.s + k.f) / 2;
+    if (Math.abs(m - 1) < 0.02) return out;
+    const o = Object.assign({}, out);
+    ['money', 'debt', 'hp', 'sr', 'achv'].forEach(f => { if (typeof o[f] === 'number') o[f] = Math.round(o[f] * m); });
+    if (o.st) { o.st = Object.assign({}, o.st); Object.keys(o.st).forEach(s => { o.st[s] = Math.round(o.st[s] * m * 10) / 10; }); }
+    return o;
+  }
+
   function resolve(p, ev, choiceId) {
     const c = visibleChoices(p, ev).find(x => x.id === choiceId) || (ev.choices || []).find(x => x.id === choiceId);
     const before = LG.Outcome.snapshot(p);
@@ -135,14 +199,27 @@
       out = c.out[type] || c.out.fail;
       p.outcomes[type]++;
     } else out = c.out || {};
+    if (c.check) out = stake(out, c.intent, type);
     const extra = LG.Outcome.apply(p, out, { ev, choice: c, type });
     const text = render(p, out.t);
     const log = render(p, out.log) || (render(p, ev.title) + ': ' + render(p, c.label) + (type === 'fail' ? ' (실패)' : type === 'partial' ? ' (절반의 성공)' : ''));
     LG.Timeline.add(p, log, out.minor ? 'minor' : 'choice', ev.icon || '', !!out.log);
     p.done[ev.id] = (p.done[ev.id] || 0) + 1;
     if (ev.cd) p.cool[ev.id] = p.age + ev.cd;
+    if (ev.cat) { p.catLast = p.catLast || {}; p.catLast[ev.cat] = p.age; }
     if (out.next) p.queue.unshift({ id: out.next, at: p.age, chain: true });
     const after = LG.Outcome.snapshot(p);
+    // 인생의 갈림길 기록 — 결과 카드에 '가장 큰 선택 3개'로 남는다
+    {
+      const dMoney = Math.abs(after.money - before.money);
+      let w = (ev.tier === 'major' ? 10 : 0) + (ev.milestone ? 6 : 0) + (out.major ? 10 : 0) + (out.log ? 4 : 0) +
+        (c.check && type !== 'partial' ? 4 : 0) + Math.abs(after.happy - before.happy) * 0.7 + Math.abs(after.rel - before.rel) * 0.5 +
+        Math.abs(after.health - before.health) * 0.4 + Math.log10(1 + dMoney / 100) * 3 + (c.intent === 'risk' || c.intent === 'adventure' ? 3 : 0);
+      if (ev.cat === 'life') w *= 0.5;
+      p.cross = p.cross || [];
+      p.cross.push({ a: p.age, ic: ev.icon || '', ti: render(p, ev.title), ch: render(p, c.label), ty: type, tx: (render(p, out.t) || '').slice(0, 90), w: Math.round(w * 10) / 10 });
+      if (p.cross.length > 60) { p.cross.sort((x, y) => y.w - x.w); p.cross.length = 40; p.cross.sort((x, y) => x.a - y.a); }
+    }
     const fx = prob ? prob.factors : [];
     return {
       ev, choice: c, type, prob,
@@ -173,19 +250,37 @@
     return { t: full, icon: ev.icon || '•', major, logged: true };
   }
 
-  function flavor(p) {
-    const list = (LG.DATA.flavor || []).filter(f => p.age >= f.a[0] && p.age <= f.a[1] && (!f.if || f.if(p)));
-    if (!list.length) return null;
+  // 잔잔한 일상 문장 하나 (나와 이어진 문장일수록 더 자주 뽑힌다)
+  function flavorOne(p, taken) {
     p.recent = p.recent || [];
-    let pick = null;
-    for (let i = 0; i < 4 && !pick; i++) {
-      const c = R().pick(p, list);
-      if (p.recent.indexOf(c.t) < 0) pick = c;
-    }
-    pick = pick || R().pick(p, list);
-    p.recent.push(pick.t); if (p.recent.length > 14) p.recent.shift();
-    return { t: render(p, pick.t), icon: pick.i || '·', flavor: true };
+    const list = (LG.DATA.flavor || []).filter(f => p.age >= f.a[0] && p.age <= f.a[1] && (!f.if || f.if(p)) && p.recent.indexOf(f.t) < 0 && taken.indexOf(f) < 0);
+    if (!list.length) return null;
+    const pick = R().weighted(p, list, f => (f.if ? 3 : 1) * (f.w || 1) * LG.Aff.mult(p, f.dom));
+    if (!pick) return null;
+    p.recent.push(pick.t); if (p.recent.length > 40) p.recent.shift();
+    return pick;
   }
+  function flavorCount(p) {
+    const a = p.age, r = R().next(p);
+    if (a < 13) return r < 0.25 ? 1 : r < 0.7 ? 2 : 3;
+    if (a < 30) return r < 0.35 ? 1 : r < 0.8 ? 2 : 3;
+    if (a < 60) return r < 0.3 ? 0 : r < 0.75 ? 1 : 2;
+    return r < 0.45 ? 1 : 2;
+  }
+  // busy: 이 해에 이미 중요한 줄이 몇 개 있는가
+  function flavorLines(p, busy, hasEvent) {
+    let n = flavorCount(p) - (busy || 0);
+    if (hasEvent && p.age >= 13) n = Math.min(n, 1);
+    const out = [], taken = [];
+    for (let i = 0; i < n; i++) {
+      const f = flavorOne(p, taken);
+      if (!f) break;
+      taken.push(f);
+      out.push({ t: render(p, f.t), icon: f.i || '·', flavor: true });
+    }
+    return out;
+  }
+  function flavor(p) { return flavorLines(p, 0, false)[0] || null; }
 
-  LG.Events = { init, get, all, eligible, pickYear, nextChained, preview, resolve, runAuto, render, flavor, visibleChoices, choiceRate };
+  LG.Events = { init, get, all, eligible, pickYear, nextChained, preview, resolve, runAuto, render, flavor, flavorLines, visibleChoices, choiceRate, weight };
 })(window.LG = window.LG || {});

@@ -60,6 +60,7 @@
         case 'children': list = Rel.all(p, 'child'); break;
         case 'friends': list = Rel.all(p, 'friend'); break;
         case 'siblings': list = Rel.all(p, 'sibling'); break;
+        case 'grandparent': list = Rel.all(p, 'grandparent'); break;
         case 'family': list = p.people.filter(n => n.alive && ['father', 'mother', 'grandparent', 'sibling', 'spouse', 'child'].indexOf(n.role) >= 0); break;
         default: list = [];
       }
