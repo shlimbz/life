@@ -5,44 +5,7 @@
   LG.DATA = LG.DATA || {};
   const E = LG.DATA.events = LG.DATA.events || [];
 
-  // ── 공용 헬퍼 (다른 이벤트 파일에서도 LG.EH로 사용) ──
-  const has = (p, f) => Object.prototype.hasOwnProperty.call(p.flags, f);
-  const tal = (p, t) => p.talents.indexOf(t) >= 0;
-  const found = (p, t) => p.found.indexOf(t) >= 0;
-  const H = LG.EH = {
-    has, tal, found,
-    rel: (p, r) => LG.Rel.get(p, r),
-    kids: p => LG.Rel.all(p, 'child'),
-    single: p => !LG.Rel.get(p, 'partner') && !LG.Rel.get(p, 'spouse'),
-    // 아직 발견하지 못한 재능 중 목록에 있는 것을 발견
-    disc: (...ts) => p => {
-      const t = ts.find(x => tal(p, x) && !found(p, x));
-      if (!t) return '';
-      p.found.push(t);
-      return `✨ ${LG.DATA.talents[t].name}에 재능이 있다는 걸 알게 되었다.`;
-    },
-    friend: (rel, note) => p => { LG.Rel.addFriend(p, rel, note); return ''; },
-    lover: o => p => { LG.Rel.makeLoveInterest(p, o); LG.State.flag(p, 'dating'); return ''; },
-    seq: (...fns) => (p, ctx) => fns.map(f => f(p, ctx)).filter(x => typeof x === 'string' && x).join(' '),
-    mulJob: m => p => { if (p.job) p.job.mul = Math.min(LG.Economy.maxMul(p.job.id), Math.round(p.job.mul * m * 1000) / 1000); return ''; },
-    college: (years, kind) => p => { p.status = 'college'; p.college = { end: p.age + years, kind: kind || 'univ' }; if (LG.State.regionAttr(p, 'edu') < 70 && kind !== 'night') p.home = 'rent'; return ''; },
-    tierDown: p => { p.family.tier = Math.max(1, p.family.tier - 1); return ''; },
-    parentsDivorce: p => {
-      const f = LG.Rel.get(p, 'father'), m = LG.Rel.get(p, 'mother');
-      if (!f || !m) return '';
-      const away = LG.RNG.chance(p, 0.7) ? f : m;
-      away.rel = Math.max(10, away.rel - 25); away.support = Math.max(5, (away.support || 50) - 30); away.note = '따로 삶';
-      p.family.tags = p.family.tags.filter(t => t !== 'conflict').concat('divorced_parents');
-      p.family.tier = Math.max(1, p.family.tier - 1);
-      LG.State.flag(p, 'parents_divorced');
-      return '';
-    },
-    // 재능/노력 중 가장 강한 분야
-    bestTalentFactor: p => {
-      const t = p.talents.find(x => ['art', 'music', 'sport', 'math', 'writing', 'language'].indexOf(x) >= 0);
-      return t ? { label: '타고난 재능', v: 20 } : null;
-    }
-  };
+  const H = LG.EH, has = H.has, tal = H.tal, found = H.found;
   const disc = H.disc, seq = H.seq;
 
   // ───────────────────────── 유년기 ─────────────────────────
@@ -255,6 +218,12 @@
     ]
   });
 
+  // 첫사랑은 한 사람으로 기억된다 — 훗날 동창회·재회에서 바로 그 사람이 돌아온다 (p.firstLoveId)
+  const firstLove = (role, rel) => p => {
+    const n = LG.Rel.makeLoveInterest(p, { role, rel: rel || 50 });
+    n.age = p.age; n.note = '첫사랑'; p.firstLoveId = n.id;
+    return '';
+  };
   E.push({
     id: 't_crush', cat: 'relationship', tier: 'choice', ages: [14, 18], w: 9, icon: '💌',
     if: p => !has(p, 'first_love'),
@@ -264,11 +233,11 @@
       { id: 'confess', label: '고백한다', intent: 'love',
         check: { base: 35, partial: 0.5, f: [['stat', 'social', 0.4], ['trait', 'extrovert', 6], ['stat', 'creativity', 0.1]] },
         out: {
-          success: { t: '그 아이도 같은 마음이었다! 풋풋한 첫 연애가 시작됐다.', log: '첫사랑과 사귐', hp: 14, flag: 'first_love', fn: p => { const n = LG.Rel.makeLoveInterest(p, { role: 'ex' }); n.note = '첫사랑'; return ''; } },
-          partial: { t: '"우리 그냥 친구로 지내자." 그래도 어색해지진 않았다.', hp: -2, flag: 'first_love', fn: H.friend(60, '친구로 남은 첫사랑') },
-          fail: { t: '거절당했다. 다음 날 학교 가는 길이 천리 같았다.', log: '첫 고백, 거절', hp: -10, st: { mental: 3 }, flag: 'first_love' }
+          success: { t: '그 아이도 같은 마음이었다! 풋풋한 첫 연애가 시작됐다.', log: '첫사랑과 사귐', hp: 14, flag: 'first_love', fn: firstLove('ex') },
+          partial: { t: '"우리 그냥 친구로 지내자." 그래도 어색해지진 않았다.', hp: -2, flag: 'first_love', fn: firstLove('friend', 60) },
+          fail: { t: '거절당했다. 다음 날 학교 가는 길이 천리 같았다.', log: '첫 고백, 거절', hp: -10, st: { mental: 3 }, flag: 'first_love', fn: firstLove('crush') }
         } },
-      { id: 'keep', label: '마음속에만 간직한다', intent: 'stability', out: { t: '말하지 못한 마음은 오래도록 남았다.', flag: ['first_love', 'unspoken_love'], hp: -2 } }
+      { id: 'keep', label: '마음속에만 간직한다', intent: 'stability', out: { t: '말하지 못한 마음은 오래도록 남았다.', flag: ['first_love', 'unspoken_love'], hp: -2, fn: firstLove('crush') } }
     ]
   });
 
@@ -455,7 +424,7 @@
   });
 
   // 전공 선택: 지금까지의 길(재능 · 환경 · 과거 선택)과 가까운 전공이 먼저 보인다
-  const A = (p, d) => LG.Aff.get(p, d);
+  const A = H.A;
   E.push({
     id: 'u_major', cat: 'education', tier: 'major', queued: true, icon: '📚', maxShow: 5,
     label: '대학', title: '전공 선택',
@@ -510,5 +479,28 @@
           fail: { t: '실기 전형에서 떨어져 경영학과로 진학했다.', major: 'biz' }
         } }
     ]
+  });
+
+  // 타고난 재능의 등급 — 수재는 일찍 눈에 띄고, 천재는 어릴 때부터 세상이 알아본다 (천재는 0.1% 안팎)
+  E.push({
+    id: 'a_prodigy', cat: 'childhood', tier: 'auto', queued: true, icon: '🌟',
+    if: p => !!p.prodigy && p.found.indexOf(p.prodigy) < 0,
+    auto: {
+      t: p => LG.DATA.talents[p.prodigy].sign + ' 신문과 방송이 찾아왔다. "이런 아이는 몇십 년에 한 번 나온다."',
+      log: p => `${LG.DATA.talents[p.prodigy].name} 분야의 천재로 세상에 알려졌다`, major: true, hp: 10, achv: 8,
+      fn: p => { LG.State.discover(p, p.prodigy, 'early'); return `✨ ${LG.DATA.talents[p.prodigy].name} 천재 — 한 시대에 몇 명 나올까 말까 한 재능이다.`; }
+    }
+  });
+  // (apply가 먼저 실행되어 이미 발견 처리된 뒤에도 같은 재능을 가리키도록, 올해 발견된 수재를 우선 찾는다)
+  const giftedNow = p => p.talents.find(x => p.tgrade && p.tgrade[x] === 'gifted' && p.found.indexOf(x) >= 0 && p.foundAt[x] === p.age && p.foundBy[x] === 'early') ||
+    p.talents.find(x => p.tgrade && p.tgrade[x] === 'gifted' && p.found.indexOf(x) < 0);
+  E.push({
+    id: 'a_gifted', cat: 'childhood', tier: 'auto', queued: true, icon: '🌠',
+    if: p => p.talents.some(t => p.tgrade && p.tgrade[t] === 'gifted' && p.found.indexOf(t) < 0),
+    auto: {
+      t: p => { const t = giftedNow(p); return t ? LG.DATA.talents[t].hint + ' 선생님들이 "또래보다 훨씬 빠르다"며 따로 챙겨 주기 시작했다.' : ''; },
+      log: p => { const t = giftedNow(p); return t ? `${LG.DATA.talents[t].name}에 남다른 수재로 눈에 띔` : ''; }, hp: 6, achv: 2,
+      fn: p => { const t = p.talents.find(x => p.tgrade[x] === 'gifted' && p.found.indexOf(x) < 0); if (!t) return ''; LG.State.discover(p, t, 'early'); return `✨ ${LG.DATA.talents[t].name} 수재로 일찍 알아봤다.`; }
+    }
   });
 })(window.LG = window.LG || {});

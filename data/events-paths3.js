@@ -2,11 +2,11 @@
 (function (LG) {
   const E = LG.DATA.events;
   const H = LG.EH, has = H.has, disc = H.disc;
-  const A = (p, d) => LG.Aff.get(p, d);
-  const jobIs = (p, ...ids) => !!p.job && ids.indexOf(p.job.id) >= 0;
-  const S = () => LG.State;
-  const ch = o => E.push(Object.assign({ tier: 'choice', w: 12, max: 1 }, o));
-  const net = p => LG.State.netWorth(p);
+  const A = H.A;
+  const jobIs = H.jobIs;
+  const S = H.S;
+  const ch = H.pusher({ tier: 'choice', w: 12, max: 1 });
+  const net = H.net;
 
   // ═════════════════════════ 과학 · 수학 ═════════════════════════
 

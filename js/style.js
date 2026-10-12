@@ -99,7 +99,7 @@
     if (y.rel) Object.keys(y.rel).forEach(r => LG.Rel.adjust(p, r, y.rel[r]));
     if (y.discover && LG.RNG.chance(p, y.discover)) {
       const t = p.talents.find(x => p.found.indexOf(x) < 0);
-      if (t) { p.found.push(t); lines.push({ t: `✨ 배우는 삶을 이어 가다 ${LG.DATA.talents[t].name}에 재능이 있다는 걸 알게 되었다.`, icon: '✨', major: true }); }
+      if (t) { S().discover(p, t, 'event'); lines.push({ t: `✨ 배우는 삶을 이어 가다 ${LG.DATA.talents[t].name}에 재능이 있다는 걸 알게 되었다.`, icon: '✨', major: true }); }
     }
     return lines;
   }

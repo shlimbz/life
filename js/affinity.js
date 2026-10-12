@@ -38,7 +38,7 @@
     volunteer: { care: 25, people: 8 }, counsel_friend: { care: 15, people: 12 }, stood_up: { people: 8, care: 6 },
     played_outside: { people: 6, sports: 5 }, kept_friends: { people: 8 },
     farm_helper: { nature: 25 }, returned_farm: { nature: 25 }, hiking: { nature: 14, sports: 6 },
-    lang_camp: { global: 25 }, working_holiday: { global: 20 }, exchange: { global: 20 }, emigrated: { global: 18 },
+    lang_camp: { global: 25 }, working_holiday: { global: 20 }, exchange: { global: 20 }, emigrated: { global: 18 }, study_abroad: { global: 22 }, early_abroad: { global: 20 }, returned_scholar: { global: 10 }, citizen_abroad: { global: 12 },
     art_academy: { art: 14 }, art_portfolio: { art: 20 }, art_admit: { art: 10 }, studio_intern: { art: 12 }, own_work: { art: 10, business: 8 }, late_artist: { art: 6 },
     music_lessons: { music: 16 }, chorus: { music: 8 }, trainee: { music: 20 }, music_prep: { music: 18 }, indie_deal: { music: 14 }, music_teacher: { music: 12, people: 6 }, late_music: { music: 6 },
     lit_club: { writing: 14 }, campus_press: { writing: 10, people: 6 }, author: { writing: 18 }, memoir: { writing: 6 },
@@ -92,8 +92,8 @@
 
     // 재능 (발견하면 크게, 숨은 재능은 은근히)
     p.talents.forEach(t => {
-      const isFound = p.found.indexOf(t) >= 0;
-      (TALENT[t] || []).forEach(([d, w]) => { a[d] += (isFound ? 30 : 10) * w; });
+      const isFound = p.found.indexOf(t) >= 0 && !(p.blocked && p.blocked[t] != null);
+      (TALENT[t] || []).forEach(([d, w]) => { a[d] += ((isFound ? 30 : 10) + ({ genius: 24, gifted: 8 }[(p.tgrade || {})[t]] || 0)) * w; });
     });
 
     // 진로 · 전공 · 직업 · 과거의 흔적
@@ -128,7 +128,8 @@
   function mult(p, doms) {
     if (!doms) return 1;
     const m = max(p, doms);
-    return m >= 20 ? 1 + m / 40 : 0.7;
+    // 나와 관련된 분야일수록 훨씬 자주 (예: 연관도 40 → 약 2.5배, 70 → 약 4.5배), 무관하면 드물게
+    return m >= 20 ? 1 + Math.pow(m / 30, 1.3) : 0.6;
   }
 
   LG.Aff = { DOMAINS, compute, get, max, top, mult };

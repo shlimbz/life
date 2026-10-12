@@ -127,20 +127,21 @@
     if (p.age < 19) return lines; // 어린이에게는 시장 소식이 와닿지 않는다
     // 시장 소식 (내가 가진 만큼만 체감한다)
     const hold = p.inv.stock, coin = p.inv.crypto;
-    if (m.stockRet <= -0.2) {
+    const cd = k => { if ((p.cool[k] || 0) > p.age) return false; p.cool[k] = p.age + (hold >= 1500 || coin >= 500 ? 3 : 5); return true; };
+    if (m.stockRet <= -0.2 && cd('newsCrash')) {
       lines.push({ t: `증시가 폭락했다(${Math.round(m.stockRet * 100)}%).` + (hold >= 500 ? R().pick(p, [' 내 주식 계좌도 파랗게 질렸다.', ' 계좌를 열어 볼 엄두가 나지 않는다.', ' 밤새 해외 증시 뉴스를 새로고침했다.']) : R().pick(p, [' 뉴스마다 곡소리다.', ' 직장 동료들의 한숨이 깊어졌다.', ' 남의 일 같지 않은 분위기다.'])), icon: '📉', major: hold >= 1500 });
       if (hold >= 1000) { S().addStat(p, 'stress', 6); S().addStat(p, 'happy', -3); if (m.stockRet <= -0.25 && p.age >= 24 && (p.cool.m_crash || 0) <= p.age) p.queue.push({ id: 'm_crash', at: p.age }); }
-    } else if (m.stockRet >= 0.28) {
+    } else if (m.stockRet >= 0.28 && cd('newsBoom')) {
       lines.push({ t: `증시가 불타올랐다(+${Math.round(m.stockRet * 100)}%).` + (hold >= 500 ? R().pick(p, [' 계좌가 두툼해졌다.', ' 수익률 화면을 한참 들여다봤다.', ' 괜히 어깨가 으쓱해진다.']) : R().pick(p, [' 남들은 다 벌었다는데…', ' 투자할걸 하는 후회가 스친다.', ' 점심시간에 주식 얘기만 오간다.'])), icon: '📈', major: hold >= 1500 });
     }
-    if (m.cryptoRet >= 1.0) {
+    if (m.cryptoRet >= 1.0 && cd('newsCoin')) {
       lines.push({ t: `코인 시장이 폭등했다(+${Math.round(m.cryptoRet * 100)}%).` + (coin >= 200 ? R().pick(p, [' 숫자가 믿기지 않는다.', ' 손이 떨려서 화면을 못 보겠다.', ' 지금 팔아야 하나 계속 고민이다.']) : R().pick(p, [' 직장 동료들이 코인 이야기뿐이다.', ' 주변에 벼락부자 소문이 돈다.', ' 괜히 마음이 싱숭생숭하다.'])), icon: '🪙', major: coin >= 500 });
       if (m.cryptoRet >= 1.2 && coin < 200 && p.age >= 22 && p.money >= 500 && (p.cool.m_fomo || 0) <= p.age) p.queue.push({ id: 'm_fomo', at: p.age });
-    } else if (m.cryptoRet <= -0.6 && coin >= 300) {
+    } else if (m.cryptoRet <= -0.6 && coin >= 300 && cd('newsCoinDown')) {
       lines.push({ t: `코인이 폭락했다(${Math.round(m.cryptoRet * 100)}%).` + R().pick(p, [' 잔고가 반의 반 토막이 났다.', ' 커뮤니티가 장례식장 분위기다.', ' 어제의 수익은 꿈처럼 사라졌다.']), icon: '💥', major: true });
       S().addStat(p, 'stress', 8); S().addStat(p, 'happy', -6);
     }
-    if (pl <= -3000 && before >= 6000) lines.push({ t: `올해 투자 손익은 ${U().money(pl)}원.` + R().pick(p, [' 쓰라린 한 해였다.', ' 수업료치고는 비싸다.', ' 한숨이 절로 나온다.']), icon: '😮‍💨' });
+    if (pl <= -3000 && before >= 6000 && cd('newsPL')) lines.push({ t: `올해 투자 손익은 ${U().money(pl)}원.` + R().pick(p, [' 쓰라린 한 해였다.', ' 수업료치고는 비싸다.', ' 한숨이 절로 나온다.']), icon: '😮‍💨' });
     else if (pl >= Math.max(3000, before * 0.12) && before >= 6000 && (p.cool.m_gain || 0) <= p.age && (p.cool.m_gain = p.age + 3)) lines.push({ t: `올해 투자로 ${U().money(pl)}원을 벌었다.` + R().pick(p, ['', ' 복리의 힘이 보이기 시작한다.', ' 인내가 보상받았다.']), icon: '💹' });
     return lines;
   }

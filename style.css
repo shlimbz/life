@@ -423,3 +423,55 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .toggle-row span { display: flex; flex-direction: column; font-weight: 600; font-size: 14.5px; }
 .toggle-row small { font-weight: 400; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
 .toggle-row input { width: 22px; height: 22px; accent-color: var(--accent, #ff8a7a); }
+
+/* 타고난 재능 (엔딩) */
+.r-tal { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
+.r-tal li { display: flex; flex-direction: column; gap: 1px; font-size: 13px; line-height: 1.4; }
+.r-tal li b { font-size: 14px; }
+.r-tal li span { opacity: .85; }
+.r-tal li.lost b, .r-tal li.lost span { opacity: .6; }
+
+/* ───────── 타이틀: 오늘의 인생 · 도감 · 설정 ───────── */
+.title-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tbtn { min-height: 58px; border-radius: 14px; background: var(--glass-2); border: 1px solid var(--line); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px; font-size: 14px; font-weight: 700; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.tbtn small { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.tbtn:active { transform: scale(.97); }
+
+/* 설정 */
+.set-row { display: flex; flex-direction: column; gap: 8px; }
+.set-lbl b { display: block; font-size: 15px; }
+.set-lbl small { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.set-seg { margin: 0; }
+
+/* 도감 */
+.dex-tabs { flex-wrap: wrap; }
+.dex-tabs small { font-size: 11px; opacity: .7; margin-left: 2px; }
+.dex-list { display: grid; gap: 6px; margin-top: 10px; }
+.dex-i { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--glass-2); border: 1px dashed var(--line); font-size: 14px; color: var(--ink-3); }
+.dex-i.got { border-style: solid; color: var(--ink); }
+.dex-i em { font-style: normal; font-size: 12px; color: var(--ink-3); flex: none; }
+.dex-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+.dex-a { padding: 10px; border-radius: 12px; background: var(--glass-2); border: 1px dashed var(--line); display: flex; flex-direction: column; gap: 2px; opacity: .55; }
+.dex-a.got { opacity: 1; border-style: solid; }
+.dex-a .di { font-size: 22px; }
+.dex-a b { font-size: 14px; }
+.dex-a small { font-size: 12px; color: var(--ink-3); line-height: 1.35; }
+.dex-a em { font-style: normal; font-size: 11px; color: var(--ink-3); }
+.end-fresh { margin: 10px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--glass-2); font-size: 13px; line-height: 1.5; text-align: center; }
+.end-fresh small { color: var(--ink-3); }
+
+/* 설정: 확률·근거 숨기기 */
+body.no-prob .pchip, body.no-prob .why-toggle, body.no-prob .why { display: none !important; }
+body.no-why .why-toggle, body.no-why .why { display: none !important; }
+
+/* 설정: 글자 크기 */
+body.fs-l .ln { font-size: 16.5px; }
+body.fs-l .ev-text, body.fs-l .res-text { font-size: 16.5px; }
+body.fs-l .ev-title { font-size: 22px; }
+body.fs-l .choice .lbl { font-size: 16.5px; }
+body.fs-l .log-item, body.fs-l .seq-step { font-size: 15.5px; }
+body.fs-xl .ln { font-size: 18px; }
+body.fs-xl .ev-text, body.fs-xl .res-text { font-size: 18.5px; }
+body.fs-xl .ev-title { font-size: 24px; }
+body.fs-xl .choice .lbl { font-size: 18px; }
+body.fs-xl .log-item, body.fs-xl .seq-step { font-size: 17px; }

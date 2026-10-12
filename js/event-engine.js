@@ -17,14 +17,16 @@
   function all() { if (!byId) init(); return LG.DATA.events; }
 
   // 나이대별 선택 이벤트 발생 확률 (20~30대가 가장 바쁘다)
+  // 목표: 한 판에 선택 25~32회 (마일스톤·예약 이벤트 포함). 20~30대가 가장 바쁘고, 노년에도 그 시기만의 선택이 이어진다.
   function choiceRate(age) {
     if (age < 6) return 0;
-    if (age < 13) return 0.22;
-    if (age < 19) return 0.36;
-    if (age < 35) return 0.5;
-    if (age < 50) return 0.38;
-    if (age < 65) return 0.28;
-    return 0.22;
+    if (age < 13) return 0.12;
+    if (age < 19) return 0.2;
+    if (age < 35) return 0.22;
+    if (age < 50) return 0.18;
+    if (age < 65) return 0.17;
+    if (age < 85) return 0.22;
+    return 0.17;
   }
 
   function baseWeight(p, ev) { return typeof ev.w === 'function' ? ev.w(p) : (ev.w != null ? ev.w : 10); }
@@ -34,8 +36,8 @@
     const last = p.catLast && p.catLast[ev.cat];
     if (last == null) return 1;
     const d = p.age - last, strong = ev.cat === 'relationship' || ev.cat === 'friend';
-    if (d <= 1) return strong ? 0.07 : 0.22;
-    if (d <= 3) return strong ? 0.25 : 0.55;
+    if (d <= 1) return strong ? 0.05 : 0.12;
+    if (d <= 3) return strong ? 0.2 : 0.4;
     if (d <= 6) return strong ? 0.55 : 0.85;
     return 1;
   }
@@ -45,7 +47,7 @@
   function riskMult(p, ev) {
     if (!ev.risk) return 1;
     const tags = p.family.tags;
-    let fam = { 1: 2.0, 2: 1.45, 3: 1, 4: 0.62, 5: 0.4 }[p.family.tier] || 1;
+    let fam = ({ 1: 2.0, 2: 1.45, 3: 1, 4: 0.62, 5: 0.4 }[p.family.tier] || 1) * (p.family.ext < 0 ? 1.25 : p.family.ext > 0 ? 0.7 : 1);
     const conflict = tags.indexOf('conflict') >= 0 || tags.indexOf('divorced_parents') >= 0 || p.flags.parents_divorced;
     if (conflict) fam *= 1.35;
     else if (tags.indexOf('single_parent') >= 0) fam *= 1.15;
@@ -57,8 +59,15 @@
     const raw = Math.pow(fam, wf) * Math.pow(eco, 1 - wf);
     return Math.max(0.3, 1 + (raw - 1) * ev.risk);
   }
-  function weight(p, ev) { return baseWeight(p, ev) * LG.Aff.mult(p, ev.dom) * recency(p, ev) * riskMult(p, ev); }
+  // 사랑·가족을 자주 골라 온 사람에게는 인연과 가족 이야기가 더 자주 찾아온다
+  function bondMult(p, ev) {
+    if (['relationship', 'marriage', 'child'].indexOf(ev.cat) < 0 || !LG.DATA.lift) return 1;
+    const l = (LG.DATA.lift(p, 'family') + LG.DATA.lift(p, 'love')) / 2;
+    return U().clamp(0.75 + l * 0.45, 0.75, 2.2);
+  }
+  function weight(p, ev) { return baseWeight(p, ev) * LG.Aff.mult(p, ev.dom) * recency(p, ev) * riskMult(p, ev) * bondMult(p, ev); }
 
+  const MIL_OK = ['health', 'money', 'friend', 'relationship', 'hardship', 'crisis', 'family', 'marriage', 'echo'];
   function eligible(p, ev, fromQueue) {
     if (!fromQueue) {
       if (ev.ages && (p.age < ev.ages[0] || p.age > ev.ages[1])) return false;
@@ -67,6 +76,8 @@
       if (ev.cd && p.cool[ev.id] && p.cool[ev.id] > p.age) return false;
       if (ev.max && (p.done[ev.id] || 0) >= ev.max) return false;
     }
+    // 군 복무 중에는 부대 밖의 일(진로·창업·대회·해외 등)은 일어나지 않는다
+    if (p.status === 'military' && !fromQueue && !ev.mil && MIL_OK.indexOf(ev.cat) < 0) return false;
     if (ev.if && !ev.if(p)) return false;
     if (ev.tier !== 'auto' && !visibleChoices(p, ev).length) return false;
     return true;
@@ -116,7 +127,8 @@
       const tries = [choiceEv ? 0.2 : 0.42, 0.14];
       tries.forEach(pr => {
         if (!R().chance(p, pr)) return;
-        const pool = all().filter(e => e.tier === 'auto' && !e.rate && eligible(p, e));
+        // 이번 해의 선택 이벤트와 같은 분야의 자동 사건은 겹치지 않게 (예: 부모님 다툼 선택 + 자동 이혼)
+        const pool = all().filter(e => e.tier === 'auto' && !e.rate && eligible(p, e) && !(choiceEv && e.cat === choiceEv.cat));
         const ev = R().weighted(p, pool, e => weight(p, e));
         if (ev) { const l = runAuto(p, ev); if (l) lines.push(l); }
       });
@@ -128,7 +140,19 @@
         if (r > 0 && R().chance(p, r)) { const l = runAuto(p, e); if (l) lines.push(l); }
       });
     }
+    // 자동 사건 때문에 선택 이벤트의 전제가 깨졌으면(예: 부모님이 이미 이혼) 이번 해에는 띄우지 않는다
+    if (choiceEv && !eligible(p, choiceEv, true)) choiceEv = null;
+    if (choiceEv) bindCtx(p, choiceEv);
     return { event: choiceEv, lines };
+  }
+
+  // 이벤트가 열릴 때 등장인물을 고정한다: 선택 결과로 결혼·이별해도 같은 이름이 쓰이고,
+  // 자녀가 여럿이면 이 이벤트가 다루는 바로 그 아이({child}), 특정 인물은 {who} 로 가리킨다.
+  function bindCtx(p, ev) {
+    const nm = role => { const n = LG.Rel.get(p, role); return n ? n.name.slice(1) : ''; };
+    const kid = typeof ev.child === 'function' ? ev.child(p) : null;
+    const who = typeof ev.who === 'function' ? ev.who(p) : null;
+    p.ctx = { ev: ev.id, partner: nm('partner'), spouse: nm('spouse'), child: kid ? kid.id : null, who: who ? who.id : null };
   }
 
   // 같은 해에 이어지는 예약 이벤트 (예: 합격 → 전공 선택)
@@ -145,14 +169,29 @@
     if (!t) return '';
     const name = role => { const n = LG.Rel.get(p, role); return n ? n.name.slice(1) : ''; };
     const friend = LG.Rel.all(p, 'friend')[0];
-    const child = LG.Rel.all(p, 'child')[0];
+    const ctx = p.ctx || {};
+    const byId = id => id != null ? p.people.find(n => n.id === id) : null;
+    const child = byId(ctx.child) || LG.Rel.all(p, 'child')[0];
+    const who = byId(ctx.who);
     const parent = LG.Rel.get(p, 'mother') || LG.Rel.get(p, 'father') || LG.Rel.get(p, 'grandparent');
     const sib = LG.Rel.get(p, 'sibling');
-    return LG.U.fixJosa(t.replace(/\{(\w+)\}/g, (m, k) => {
+    // 이름 뒤에 바로 붙은 조사(와/과 · 을/를 · 은/는)는 받침에 맞게 고친다 → "주원와" 대신 "주원과"
+    const MARK = '\u0001', END = '\u0002';
+    const filled = t.replace(/\{(\w+)\}/g, (m, k) => { const v = fill(k); return v === m ? m : MARK + v + END; });
+    const PAIR = { 와: ['과', '와'], 과: ['과', '와'], 을: ['을', '를'], 를: ['을', '를'], 은: ['은', '는'], 는: ['은', '는'] };
+    const fixed = filled.replace(/\u0001([^\u0002]*)\u0002(와|과|을|를|은|는)?(?=[\s,.!?"'’”)…]|$)/g, (m, v, j) => {
+      if (!j) return v;
+      const ch = v.charCodeAt(v.length - 1) - 0xAC00;
+      const has = ch >= 0 && ch <= 11171 && ch % 28 !== 0;
+      return v + PAIR[j][has ? 0 : 1];
+    }).replace(/[\u0001\u0002]/g, '');
+    return LG.U.fixJosa(fixed);
+    function fill(k) {
       switch (k) {
         case 'name': return p.given;
-        case 'partner': return name('partner') || '그 사람';
-        case 'spouse': return name('spouse') || '배우자';
+        case 'partner': return name('partner') || ctx.partner || '그 사람';
+        case 'spouse': return name('spouse') || ctx.spouse || '배우자';
+        case 'who': return who ? who.name.slice(1) : '그 사람';
         case 'friend': return friend ? friend.name.slice(1) : '친구';
         case 'child': return child ? child.name.slice(1) : '아이';
         case 'sibling': return sib ? sib.name.slice(1) : '형제';
@@ -160,9 +199,9 @@
         case 'job': return S().jobLabel(p);
         case 'region': return S().liveRegion(p).short;
         case 'town': return p.town;
-        default: return m;
+        default: return '{' + k + '}';
       }
-    }));
+    }
   }
 
   function preview(p, ev) {
@@ -205,7 +244,7 @@
     const log = render(p, out.log) || (render(p, ev.title) + ': ' + render(p, c.label) + (type === 'fail' ? ' (실패)' : type === 'partial' ? ' (절반의 성공)' : ''));
     LG.Timeline.add(p, log, out.minor ? 'minor' : 'choice', ev.icon || '', !!out.log);
     p.done[ev.id] = (p.done[ev.id] || 0) + 1;
-    if (ev.cd) p.cool[ev.id] = p.age + ev.cd;
+    if (ev.cd) p.cool[ev.id] = p.age + (typeof ev.cd === 'function' ? ev.cd(p) : ev.cd);
     if (ev.cat) { p.catLast = p.catLast || {}; p.catLast[ev.cat] = p.age; }
     if (out.next) p.queue.unshift({ id: out.next, at: p.age, chain: true });
     const after = LG.Outcome.snapshot(p);
@@ -232,6 +271,7 @@
   }
 
   function runAuto(p, ev) {
+    if (ev.child || ev.who) bindCtx(p, ev);
     let out = ev.auto || {};
     if (ev.check) {
       const prob = LG.Prob.compute(p, ev.check, ev.intent, !!ev.out.partial);
@@ -243,7 +283,7 @@
     const text = render(p, out.t);
     if (out.next) p.queue.unshift({ id: out.next, at: p.age, chain: true });
     p.done[ev.id] = (p.done[ev.id] || 0) + 1;
-    if (ev.cd) p.cool[ev.id] = p.age + ev.cd;
+    if (ev.cd) p.cool[ev.id] = p.age + (typeof ev.cd === 'function' ? ev.cd(p) : ev.cd);
     const full = (text + (extra ? ' ' + extra : '')).trim();
     const major = !!(out.major || ev.major);
     LG.Timeline.add(p, render(p, out.log) || full, major ? 'major' : 'minor', ev.icon || '');
@@ -282,5 +322,5 @@
   }
   function flavor(p) { return flavorLines(p, 0, false)[0] || null; }
 
-  LG.Events = { init, get, all, eligible, pickYear, nextChained, preview, resolve, runAuto, render, flavor, flavorLines, visibleChoices, choiceRate, weight };
+  LG.Events = { init, get, all, eligible, pickYear, nextChained, bindCtx, preview, resolve, runAuto, render, flavor, flavorLines, visibleChoices, choiceRate, weight };
 })(window.LG = window.LG || {});

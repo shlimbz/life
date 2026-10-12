@@ -11,6 +11,8 @@
     p.job = { id, years: 0, perf: Math.round(U().clamp(o.perf != null ? o.perf : 45 + LG.RNG.int(p, -5, 10), 5, 100)), mul: o.mul || 1, since: p.age };
     p.status = 'working';
     p.jobHistory.push({ id, age: p.age });
+    if (id === 'athlete') S().flag(p, 'pro_athlete');
+    p.seekTries = 0;
     p.exp += 1.5;
     if (p.home === 'parents' && p.age >= 20 && LG.RNG.chance(p, 0.25)) p.home = 'rent';
   }
@@ -48,7 +50,7 @@
     if (eff.discover) {
       const t = eff.discover === true ? p.talents.find(x => p.found.indexOf(x) < 0) : eff.discover;
       if (t && p.talents.indexOf(t) >= 0 && p.found.indexOf(t) < 0) {
-        p.found.push(t);
+        S().discover(p, t, 'event');
         extra += ` ✨ ${LG.DATA.talents[t].name}에 재능이 있다는 걸 알게 되었다.`;
       }
     }

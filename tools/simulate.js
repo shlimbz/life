@@ -8,7 +8,7 @@ const vm = require('vm');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]).filter(s => !s.includes('ui.js') && !s.includes('main.js'));
+const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]).filter(s => !s.startsWith('js/ui/') && !s.includes('ui.js') && !s.includes('main.js'));
 
 const ctx = { window: {}, console, Math, Date, JSON, Object, Array };
 ctx.window = ctx;

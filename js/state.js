@@ -69,13 +69,13 @@
 
     create(gender, seed) {
       return {
-        v: 1, seed, rngState: LG.RNG.hashSeed(seed),
+        v: 7, seed, rngState: LG.RNG.hashSeed(seed), daily: null, seekTries: 0, dz: {}, car: null, bldg: null, ctx: null, firstLoveId: null,
         gender, name: '', surname: '', given: '',
         birthYear: 2000, age: 0, year: 2000, alive: true, cause: null,
         region: 'seoul', urban: true, town: '',
-        family: { structure: 'both', tier: 3, tags: [], home: '', eduEnv: 50 },
+        family: { structure: 'both', tier: 3, ext: 0, tags: [], home: '', eduEnv: 50 },
         stats: { health: 70, intelligence: 50, social: 50, physical: 50, creativity: 50, mental: 50 },
-        talents: [], found: [], traits: [],
+        talents: [], found: [], foundAt: {}, foundBy: {}, prodigy: null, tgrade: {}, blocked: {}, traits: [],
         luck: 0, luckLog: { good: 0, bad: 0 },
         effort: { study: 0, sport: 0, art: 0, work: 0, health: 0, social: 0 },
         happy: 65, stress: 15,
@@ -104,18 +104,47 @@
       else p.stats[k] = U.clamp(p.stats[k] + d, 1, 100);
     },
 
-    netWorth(p) { return p.money + (p.inv ? p.inv.deposit + p.inv.stock + p.inv.crypto : 0) + (p.house ? p.house.value : 0) - p.debt; },
+    netWorth(p) { return p.money + (p.inv ? p.inv.deposit + p.inv.stock + p.inv.crypto : 0) + (p.house ? p.house.value : 0) + (p.car ? p.car.value : 0) + (p.bldg ? p.bldg.value : 0) - p.debt; },
 
     // 예전 세이브에 새 필드를 채워 넣는다
+    // 재능 발견 기록 (언제, 어떻게 알게 되었는지) — 엔딩에서 보여 준다
+    discover(p, t, how) {
+      if (!t || p.found.indexOf(t) >= 0) return false;
+      p.found.push(t); p.foundAt = p.foundAt || {}; p.foundBy = p.foundBy || {};
+      p.foundAt[t] = p.age; p.foundBy[t] = how || 'event';
+      return true;
+    },
+
+    gradeName(p, t) { return { genius: '천재', gifted: '수재' }[(p.tgrade || {})[t]] || '범재'; },
+
+    // ───── 저장 데이터 버전 관리 ─────
+    // 상태 구조가 바뀔 때마다 SAVE_VERSION 을 올리고, MIGRATIONS 에 '이전 버전 → 다음 버전' 변환 함수를 하나 추가한다.
+    // 불러올 때 저장본의 버전부터 현재 버전까지 차례로 적용한다. 각 단계는 여러 번 실행해도 안전해야 한다(멱등).
+    SAVE_VERSION: 7,
+    MIGRATIONS: {
+      // v1 → v2: 자산관리(투자) 도입
+      1: p => { p.inv = p.inv || { deposit: 0, stock: 0, crypto: 0 }; if (p.invPolicy === undefined) p.invPolicy = null; if (p.invLast === undefined) p.invLast = null; p.catLast = p.catLast || {}; p.mkt = p.mkt || null; },
+      // v2 → v3: 삶의 방식(라이프스타일) · 인생의 갈림길 기록
+      2: p => { if (p.style === undefined) p.style = null; p.styleSince = p.styleSince || 0; p.styleChosen = !!p.styleChosen; p.styleYears = p.styleYears || {}; p.styleLog = p.styleLog || []; p.cross = p.cross || []; },
+      // v3 → v4: 재능 등급 · 발견 기록 · 출생 양극단
+      3: p => { p.foundAt = p.foundAt || {}; p.foundBy = p.foundBy || {}; if (p.prodigy === undefined) p.prodigy = null; p.tgrade = p.tgrade || {}; p.blocked = p.blocked || {}; if (p.family && p.family.ext === undefined) p.family.ext = 0; },
+      // v4 → v5: 오늘의 인생 · 구직 횟수
+      4: p => { if (p.daily === undefined) p.daily = null; p.seekTries = p.seekTries || 0; },
+      // v5 → v6: 질병(p.dz) · 자동차(p.car)
+      5: p => { p.dz = p.dz || {}; if (p.car === undefined) p.car = null; },
+      // v6 → v7: 건물(p.bldg) · 이벤트 등장인물 고정(p.ctx) · 첫사랑(p.firstLoveId)
+      6: p => { if (p.bldg === undefined) p.bldg = null; if (p.ctx === undefined) p.ctx = null; if (p.firstLoveId === undefined) p.firstLoveId = null; }
+    },
     migrate(p) {
-      if (!p) return p;
-      p.inv = p.inv || { deposit: 0, stock: 0, crypto: 0 };
-      if (p.invPolicy === undefined) p.invPolicy = null;
-      if (p.invLast === undefined) p.invLast = null;
-      p.catLast = p.catLast || {};
-      p.mkt = p.mkt || null;
-      if (p.style === undefined) p.style = null;
-      p.styleSince = p.styleSince || 0; p.styleChosen = !!p.styleChosen; p.styleYears = p.styleYears || {}; p.styleLog = p.styleLog || []; p.cross = p.cross || [];
+      if (!p || typeof p !== 'object') return null;
+      let v = +p.v || 1;
+      if (v > State.SAVE_VERSION) throw new Error(`더 새로운 버전의 저장 데이터(v${v})`);
+      while (v < State.SAVE_VERSION) { (State.MIGRATIONS[v] || (() => {}))(p); v++; }
+      // 같은 버전이라도 빠진 칸이 있으면 채운다 (모든 단계는 멱등)
+      Object.keys(State.MIGRATIONS).forEach(k => State.MIGRATIONS[k](p));
+      p.v = State.SAVE_VERSION;
+      const ok = typeof p.seed === 'string' && typeof p.age === 'number' && p.stats && Array.isArray(p.people) && Array.isArray(p.history) && p.flags && p.family;
+      if (!ok) throw new Error('저장 데이터의 필수 항목이 비어 있음');
       return p;
     },
 
@@ -188,10 +217,11 @@
 
     jobLabel(p) {
       if (p.job) return LG.DATA.jobs[p.job.id].name;
+      if (p.bldg && (p.status === 'idle' || p.status === 'retired' || p.status === 'seeking')) return '건물주';
       const map = {
         child: p.age < 7 ? '아이' : '학생', student: '학생', college: '대학생', military: '군 복무 중',
         seeking: '구직 중', retired: '은퇴', parttime: '아르바이트', grad: '대학원생',
-        unemployed: '무직', retake: '재수생', abroad: '유학 중'
+        unemployed: '무직', retake: '재수생', abroad: '유학 중', recluse: '은둔 중', idle: '돈 많은 백수', trainee: '연습생'
       };
       return map[p.status] || '—';
     },

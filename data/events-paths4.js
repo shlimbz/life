@@ -2,10 +2,10 @@
 (function (LG) {
   const E = LG.DATA.events;
   const H = LG.EH, has = H.has, disc = H.disc;
-  const A = (p, d) => LG.Aff.get(p, d);
-  const jobIs = (p, ...ids) => !!p.job && ids.indexOf(p.job.id) >= 0;
-  const S = () => LG.State;
-  const ch = o => E.push(Object.assign({ tier: 'choice', w: 12, max: 1 }, o));
+  const A = H.A;
+  const jobIs = H.jobIs;
+  const S = H.S;
+  const ch = H.pusher({ tier: 'choice', w: 12, max: 1 });
 
   // ═════════════════════════ 돌봄 · 봉사 ═════════════════════════
 
@@ -215,7 +215,7 @@
 
   ch({
     id: 'gl_exam', cat: 'global', ages: [15, 19], dom: ['global'], icon: '🌐', label: '세계', w: 13,
-    if: p => A(p, 'global') >= 24 && (p.track === 'academic' || p.track == null),
+    if: p => A(p, 'global') >= 18 && (p.track === 'academic' || p.track == null),
     title: '외국어와 해외 진학', text: '외국어고·국제학교 입학 설명회, 그리고 해외 대학 진학 이야기가 솔솔 들린다. 어학 시험 점수가 곧 선택지를 넓혀 준다.',
     choices: [
       { id: 'foreign', label: '외고·어학 특기로 입시를 준비한다', intent: 'education',
@@ -233,7 +233,7 @@
 
   ch({
     id: 'gl_job_abroad', cat: 'global', ages: [23, 34], dom: ['global'], icon: '🛫', label: '세계', w: 14,
-    if: p => A(p, 'global') >= 34 && (p.major === 'lang' || has(p, 'lang_track') || has(p, 'working_holiday') || has(p, 'abroad_exp') || jobIs(p, 'translator')),
+    if: p => A(p, 'global') >= 24 && (p.major === 'lang' || has(p, 'lang_track') || has(p, 'working_holiday') || has(p, 'abroad_exp') || jobIs(p, 'translator')),
     title: '해외 일자리 제안', text: '해외 지사에서 일하는 선배가 "우리 쪽에 자리가 났다"며 연락을 줬다. 낯선 나라에서 새 삶을 시작할 기회지만, 가족과 친구는 멀어진다.',
     choices: [
       { id: 'go', label: '짐을 싸서 떠난다', intent: 'adventure',

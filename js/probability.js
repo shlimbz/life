@@ -13,7 +13,7 @@
     stat(p, k, w) { return { label: S().STAT_LABEL[k], v: (p.stats[k] - 50) * w }; },
     // 노력: 10 미만이면 오히려 감점 (아무것도 안 하면 불리)
     eff(p, k, w) { const e = p.effort[k] || 0; return { label: e >= 10 ? S().EFF_LABEL[k] : S().EFF_LABEL[k] + ' 부족', v: (e - 10) * w }; },
-    family(p, w) { return { label: '집안 형편', v: (p.family.tier - 3) * 9 * w }; },
+    family(p, w) { return { label: '집안 형편', v: ((p.family.tier - 3) * 9 + (p.family.ext || 0) * 9) * w }; },
     support(p, w) { return { label: '부모님의 지원', v: (S().supportScore(p) - 55) * w }; },
     assets(p, w) {
       const nw = S().netWorth(p);
@@ -21,7 +21,13 @@
       return { label: nw > 0 ? '모아둔 돈' : '빚', v: v * w };
     },
     region(p, k, w) { return { label: REGION_LABEL[k] || '지역', v: (S().regionAttr(p, k) - 60) * w }; },
-    talent(p, t, v) { return S().hasTalent(p, t) ? { label: LG.DATA.talents[t].name + ' 재능', v } : null; },
+    talent(p, t, v) {
+      if (!S().hasTalent(p, t)) return null;
+      // 재능의 등급이 높을수록 효과가 크지만, 키울 기회를 잃은 재능은 힘을 잃는다
+      const g = { genius: 1.6, gifted: 1.25 }[(p.tgrade || {})[t]] || 1;
+      if (p.blocked && p.blocked[t] != null) return { label: LG.DATA.talents[t].name + ' (접어 둔 재능)', v: v * 0.3 };
+      return { label: LG.DATA.talents[t].name + ' 재능', v: v * g };
+    },
     trait(p, t, v) { return S().hasTrait(p, t) ? { label: LG.DATA.traits[t].name + ' 성격', v } : null; },
     flag(p, f, v, label) { return S().has(p, f) ? { label, v } : null; },
     noflag(p, f, v, label) { return !S().has(p, f) ? { label, v } : null; },

@@ -9,10 +9,18 @@
     rural: { 1: ['낡은 시골집', '조립식 주택'], 2: ['시골 주택', '작은 연립'], 3: ['시골 단독주택', '읍내 아파트'], 4: ['넓은 전원주택', '읍내 신축 아파트'], 5: ['큰 전원주택', '과수원이 딸린 집'] }
   };
   const TIER_LABEL = { 1: '어려움', 2: '빠듯함', 3: '보통', 4: '여유 있음', 5: '부유함' };
+  // 극단 가정은 별도 표기, 돈과 관련된 지원·상속·부담은 이 배수로 조절한다
+  const tierLabel = p => p.family.ext > 0 ? '재벌·자산가 가문' : p.family.ext < 0 ? '극빈 (기초수급)' : TIER_LABEL[p.family.tier];
+  const ext = p => p.family.ext || 0;
+  const giftMul = p => ext(p) > 0 ? 5 : ext(p) < 0 ? 0 : 1;   // 증여·상속·결혼 지원
+  const burdenMul = p => ext(p) < 0 ? 2.2 : 1;                  // 부모 세대의 빚·병원비 부담
 
   function generate(gender, seed) {
-    const p = S().create(gender, seed);
+    const p = S().create(gender || 'F', seed);
     const r = R();
+    // 성별도 태어날 때 정해진다 — 시드에서 뽑으므로 같은 인생 코드는 같은 성별로 태어난다
+    if (gender !== 'M' && gender !== 'F') p.gender = r.chance(p, 0.512) ? 'M' : 'F';
+    gender = p.gender;
 
     // 1. 이름
     p.surname = r.weightedKey(p, LG.DATA.names.surnames);
@@ -31,20 +39,27 @@
     p.town = r.pick(p, p.urban ? reg.cities : reg.rural);
 
     // 4. 가정 형편 (지역 편향 + 정규분포, 1~5)
-    const tierRaw = r.normal(p, 3 + reg.wealth * 0.9 - (p.urban ? 0 : 0.35), 1.0);
+    // 한국의 자산 분포는 오른쪽으로 길게 늘어진 모양: 중간 아래가 두텁고, 소수가 아주 부유하다
+    const tierRaw = r.normal(p, 2.85 + reg.wealth * 1.1 - (p.urban ? 0 : 0.3), 1.05);
     p.family.tier = U().clamp(Math.round(tierRaw), 1, 5);
+    // 양 극단: 기초생활수급 수준의 극빈 가정(약 4%)과 재벌·자산가 가문(약 1.5%)
+    p.family.ext = 0;
+    const ex = r.float(p, 0, 1);
+    if (ex < 0.04 + (p.family.tier === 1 ? 0.03 : 0) * (reg.wealth < 0 ? 1 : 0.5)) { p.family.ext = -1; p.family.tier = 1; }
+    else if (ex > 0.985 - (p.family.tier === 5 ? 0.012 : 0) - (reg.short === '서울' ? 0.008 : 0)) { p.family.ext = 1; p.family.tier = 5; }
 
     // 5. 가족 형태
     const structure = r.weightedKey(p, { both: 68, single_mom: 9, single_dad: 4, grand: 10, big: 9 });
     p.family.structure = structure === 'big' ? 'both' : structure;
     const tags = [];
     if (structure === 'big') tags.push('big_family');
-    if (structure === 'single_mom' || structure === 'single_dad') { tags.push('single_parent'); p.family.tier = Math.max(1, p.family.tier - (r.chance(p, 0.6) ? 1 : 0)); }
+    if (structure === 'single_mom' || structure === 'single_dad') { tags.push('single_parent'); if (p.family.ext <= 0) p.family.tier = Math.max(1, p.family.tier - (r.chance(p, 0.6) ? 1 : 0)); }
+    if (p.family.ext < 0 && !tags.length) tags.push('job_risk');
 
     // 6. 부모 NPC
     const mkParent = (role, gender) => {
       const age = r.int(p, 25, 38) + (role === 'father' ? r.int(p, 0, 3) : 0);
-      const job = r.weightedKey(p, LG.DATA.parentJobs[p.family.tier]);
+      const job = r.weightedKey(p, p.family.ext > 0 ? { ceo: 8, doctor: 3, lawyer: 3, office_big: 1 } : p.family.ext < 0 ? { parttime: 5, service: 3, driver: 2, farmer: 1, homemaker: 2 } : LG.DATA.parentJobs[p.family.tier]);
       const J = LG.DATA.jobs[job];
       const pers = r.pick(p, LG.Rel.PERSONALITIES);
       let support = r.normal(p, 58, 16);
@@ -85,7 +100,9 @@
     p.people.filter(n => n.role === 'sibling' && n.note === '동생').forEach(n => { n.age = -r.int(p, 1, 5); n.alive = true; });
 
     // 8. 주거
-    p.family.home = r.pick(p, HOMES[p.urban ? 'urban' : 'rural'][p.family.tier]);
+    p.family.home = p.family.ext > 0 ? r.pick(p, p.urban ? ['한강이 보이는 펜트하우스', '성북동 대저택', '도심 한복판 고급 빌라'] : ['넓은 정원이 딸린 대저택', '산을 낀 별장 같은 집']) :
+      p.family.ext < 0 ? r.pick(p, p.urban ? ['고시원 같은 쪽방', '반지하 단칸방', '임대주택 단칸방'] : ['비 새는 낡은 시골집', '농막 같은 집']) :
+      r.pick(p, HOMES[p.urban ? 'urban' : 'rural'][p.family.tier]);
     p.family.tags = tags;
 
     // 9. 교육환경 (지역 접근성 + 형편 + 부모 학력)
@@ -108,6 +125,17 @@
         Object.keys(b).forEach(k => S().addStat(p, k, b[k]));
       }
     }
+
+    // 재능의 등급: 범재(대부분) · 수재(약 6%, 일찍 눈에 띈다) · 천재(0.1% 안팎 — 한 시대에 몇 명 나올까 말까 한 진짜 천재)
+    p.tgrade = {}; p.prodigy = null;
+    p.talents.forEach(t => {
+      const x = r.float(p, 0, 1), b = LG.DATA.talents[t].boost;
+      const g = x < 0.0015 ? 'genius' : x < 0.0615 ? 'gifted' : 'common';
+      p.tgrade[t] = g;
+      if (g !== 'common') Object.keys(b).forEach(k => S().addStat(p, k, Math.round(b[k] * (g === 'genius' ? 1.8 : 0.5))));
+      if (g === 'genius') { p.prodigy = t; p.queue.push({ id: 'a_prodigy', at: r.int(p, 5, 8) }); }
+      else if (g === 'gifted') p.queue.push({ id: 'a_gifted', at: r.int(p, 7, 12), t });
+    });
 
     // 12. 성격 (5축 중 3축)
     const axes = LG.DATA.traitAxes.slice();
@@ -154,5 +182,5 @@
     return { pros: pros.slice(0, 3), cons: cons.slice(0, 3) };
   }
 
-  LG.Birth = { generate, prosCons, TIER_LABEL };
+  LG.Birth = { generate, prosCons, TIER_LABEL, tierLabel, giftMul, burdenMul };
 })(window.LG = window.LG || {});

@@ -18,7 +18,7 @@
     cook:        { name: '요리사', icon: '🍳', income: 2700, growth: 0.035, stab: 46, stress: 64, status: 44, hp: -0.3, wlb: 34, edu: 'none', vary: 0.05, achv: 1 },
     service:     { name: '서비스직', icon: '🛎️', income: 2500, growth: 0.015, stab: 40, stress: 58, status: 34, hp: -0.2, wlb: 44, edu: 'none', vary: 0, achv: 0.5 },
     factory:     { name: '생산직', icon: '🏭', income: 3300, growth: 0.025, stab: 62, stress: 50, status: 40, hp: -0.4, wlb: 50, edu: 'none', vary: 0, achv: 0.6 },
-    technician:  { name: '기술직', icon: '🔧', income: 3500, growth: 0.04, stab: 66, stress: 46, status: 50, hp: -0.3, wlb: 56, edu: 'none', vary: 0.05, achv: 1 },
+    technician:  { name: '기술직', icon: '🔧', income: 3300, growth: 0.032, stab: 66, stress: 46, status: 50, hp: -0.3, wlb: 56, edu: 'none', vary: 0.05, achv: 1 },
     selfemp:     { name: '자영업자', icon: '🏪', income: 3600, growth: 0.02, stab: 30, stress: 70, status: 50, hp: -0.4, wlb: 30, edu: 'none', vary: 0.35, achv: 1.2 },
     freelancer:  { name: '프리랜서', icon: '🧑‍💻', income: 3000, growth: 0.03, stab: 28, stress: 50, status: 50, hp: -0.1, wlb: 62, edu: 'none', vary: 0.3, achv: 1 },
     artist:      { name: '예술가', icon: '🖌️', income: 1900, growth: 0.03, stab: 18, stress: 48, status: 52, hp: 0, wlb: 70, edu: 'none', vary: 0.5, achv: 1.4 },
@@ -34,6 +34,8 @@
     translator:  { name: '통번역가', icon: '🌐', income: 3300, growth: 0.035, stab: 40, stress: 52, status: 58, hp: -0.1, wlb: 58, edu: 'college', vary: 0.2, achv: 1.1 },
     engineer:    { name: '엔지니어', icon: '🛠️', income: 4000, growth: 0.04, stab: 66, stress: 56, status: 60, hp: -0.2, wlb: 50, edu: 'college', vary: 0, achv: 1.1 },
     parttime:    { name: '아르바이트', icon: '🧾', income: 1700, growth: 0.01, stab: 15, stress: 48, status: 24, hp: -0.1, wlb: 50, edu: 'none', vary: 0.1, achv: 0.2 },
+    idol:        { name: '아이돌', icon: '🎤', income: 2200, growth: 0.06, stab: 10, stress: 84, status: 74, hp: -0.4, wlb: 18, edu: 'none', vary: 0.8, achv: 2.2 },
+    entertainer: { name: '연예인', icon: '🎬', income: 2600, growth: 0.05, stab: 14, stress: 72, status: 76, hp: -0.2, wlb: 34, edu: 'none', vary: 0.75, achv: 2 },
     homemaker:   { name: '전업주부', icon: '🏠', income: 0, growth: 0, stab: 80, stress: 45, status: 40, hp: 0, wlb: 50, edu: 'none', vary: 0, achv: 0.6 }
   };
 

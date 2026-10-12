@@ -37,7 +37,7 @@
     // 성인이 되면 부모님이 형편껏 보태 주신다
     if (a === 20 && !S().has(p, 'seed_money')) {
       S().flag(p, 'seed_money');
-      const gift = { 1: 0, 2: 100, 3: 500, 4: 2500, 5: 7000 }[p.family.tier] * U().clamp(S().supportScore(p) / 60, 0.4, 1.3);
+      const gift = { 1: 0, 2: 50, 3: 200, 4: 800, 5: 3500 }[p.family.tier] * U().clamp(S().supportScore(p) / 60, 0.4, 1.3) * LG.Birth.giftMul(p);
       if (gift >= 100) { p.money += Math.round(gift / 10) * 10; lines.push({ t: `부모님이 사회 초년생 통장에 ${U().money(gift)}원을 넣어 주셨다.`, icon: '🎁' }); }
     }
 

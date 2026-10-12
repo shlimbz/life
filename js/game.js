@@ -4,8 +4,9 @@
   const S = () => LG.State;
 
   const Game = {
-    newLife(gender, seed) {
+    newLife(gender, seed, daily) {
       const p = LG.Birth.generate(gender, seed || LG.RNG.newSeed());
+      if (daily) p.daily = daily;   // 오늘의 인생 (YYYY-MM-DD)
       const reg = LG.DATA.regions[p.region];
       LG.Timeline.add(p, `${p.birthYear}년, ${reg.short} ${p.town}의 ${p.urban ? '' : '시골 '}한 가정에서 태어났다.`, 'birth', '👶');
       LG.Events.init();
@@ -53,6 +54,7 @@
       const res = LG.Events.resolve(p, ev, choiceId);
       res.text = LG.U.fixJosa(res.text);
       const nx = LG.Events.nextChained(p);
+      if (nx) LG.Events.bindCtx(p, nx);
       p.pending = nx ? nx.id : null;
       return res;
     },
@@ -72,7 +74,7 @@
       return {
         seed: p.seed, name: p.name, gender: p.gender, age: p.age, birthYear: p.birthYear,
         region: LG.DATA.regions[p.region].short, title: e.title, oneLiner: e.oneLiner,
-        job: e.job, s: e.s, net: e.net, at: Date.now()
+        job: e.job, s: e.s, net: e.net, total: e.total, daily: p.daily || null, at: Date.now()
       };
     }
   };

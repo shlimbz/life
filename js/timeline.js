@@ -65,11 +65,14 @@
     const total = Object.keys(p.intents).reduce((a, k) => a + p.intents[k], 0);
     if (total < (min || 6)) return null;
     let best = null;
+    // 평균보다 얼마나 더 골랐는가(lift)로 본다 — 선택지 구성상 원래 많은 '안정'이 늘 이기지 않도록
+    const lift = LG.DATA.lift;
     TEND.forEach(t => {
-      const sc = Object.keys(t.w).reduce((a, k) => a + (p.intents[k] || 0) * t.w[k], 0) / total;
+      const ws = Object.keys(t.w).reduce((a, k) => a + t.w[k], 0);
+      const sc = Object.keys(t.w).reduce((a, k) => a + lift(p, k) * t.w[k], 0) / ws;
       if (!best || sc > best.sc) best = { sc, t };
     });
-    return best && best.sc >= 0.22 ? best.t : null;
+    return best && best.sc >= 1.25 ? best.t : null;
   }
 
   // 가장 오래 한 일 = 그 사람의 직업
@@ -103,10 +106,22 @@
     const kids = p.people.filter(n => n.role === 'child').length;
     const spouse = p.people.find(n => n.role === 'spouse');
     const lastJob = mainJob(p);
+    // 타고난 재능 — 언제, 어떻게 알게 되었는가 (끝내 모른 채 지나간 재능도 있다)
+    const talents = p.talents.map(t => {
+      const T = LG.DATA.talents[t], f = p.found.indexOf(t) >= 0, g = (p.tgrade || {})[t] || 'common';
+      const how = f ? (p.foundBy && p.foundBy[t]) || 'event' : null, at = p.foundAt[t];
+      let line;
+      if (g === 'genius') line = `천재 · ${at}세에 세상이 알아본, 한 시대에 몇 명 없는 재능`;
+      else if (g === 'gifted') line = f ? `수재 · ${at}세에 일찍 눈에 띄었다` : '수재 · 끝내 빛을 보지 못했다';
+      else if (!f) line = '범재 · 끝내 발견하지 못했다';
+      else line = `범재 · ${at != null ? at + '세에 ' : ''}${at != null && at >= 30 ? '늦게 알게 된 재능' : '스스로 찾아낸 재능'}`;
+      if (p.blocked && p.blocked[t] != null) line = `${g === 'genius' ? '천재' : g === 'gifted' ? '수재' : '범재'} · ${p.blocked[t]}세에 사정상 접어야 했다`;
+      return { name: T.name, icon: T.icon, found: f, grade: g, prodigy: g === 'genius', line };
+    });
     return {
       s, title, oneLiner: best.t, values, luck, total: tot, grade: grade(tot),
       dom: c.dom ? LG.Style.STYLES[c.dom] : null, tend: c.tend, cross: crossroads(p, 3),
-      age: p.age, job: lastJob, kids,
+      age: p.age, job: lastJob, kids, talents,
       spouse: spouse ? (spouse.alive ? '있음' : '사별') : p.flags.divorced ? '이혼' : '없음',
       net: S().netWorth(p), choices: p.choices, outcomes: p.outcomes
     };

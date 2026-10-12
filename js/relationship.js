@@ -106,6 +106,22 @@
       return pt;
     },
 
+    // 예전 인연이 다시 연인이 된다 (새 사람을 만들지 않고 같은 사람이 돌아온다)
+    revive(p, n, rel) {
+      if (!n || !n.alive) return null;
+      const cur = Rel.get(p, 'partner'); if (cur && cur !== n) Rel.breakup(p);
+      n.role = 'partner'; n.rel = Math.max(n.rel, rel || 66); n.since = p.age; n.waits = 0; n.proposer = null;
+      LG.State.flag(p, 'dating');
+      return n;
+    },
+    // 지난 인연 후보: 첫사랑 → 가장 최근의 옛 연인 순
+    pastLove(p) {
+      const alive = n => n && n.alive && n.age >= 18;
+      const fl = p.firstLoveId != null ? p.people.find(n => n.id === p.firstLoveId) : null;
+      const exes = p.people.filter(n => alive(n) && n.role === 'ex').sort((a, b) => b.since - a.since);
+      return alive(fl) && ['ex', 'crush', 'past_friend', 'friend'].indexOf(fl.role) >= 0 ? fl : exes[0] || null;
+    },
+
     breakup(p) {
       const pt = Rel.get(p, 'partner');
       if (pt) { pt.role = 'ex'; pt.rel = Math.min(pt.rel, 30); }
@@ -153,11 +169,15 @@
         if (n.age >= 63 && n.job && n.role !== 'child') { n.job = null; n.income = Math.round(n.income * 0.3); }
       });
 
-      // 사망 (부모·조부모·배우자·형제)
+      // 사망 (부모·조부모·배우자·형제, 그리고 60세 이상이 된 자녀)
+      // 의도: 젊은 자녀의 죽음은 무작위 '자연사'로 다루지 않는다(너무 자의적이고 가혹하다).
+      //       자녀가 60세를 넘긴 뒤(내가 아주 오래 살았을 때)만 노화에 따른 사망이 일어날 수 있다.
+      const CHILD_NATURAL_DEATH_AGE = 60;
       p.people.forEach(n => {
-        if (!n.alive || n.role === 'child' && n.age < 60) return;
+        if (!n.alive) return;
+        if (n.role === 'child' && n.age < CHILD_NATURAL_DEATH_AGE) return;
         if (['ex', 'ex_spouse', 'friend'].indexOf(n.role) >= 0) return;
-        const hz = LG.Health.hazard(n.age, n.health) * (n.role === 'grandparent' ? 1.2 : 1);
+        const hz = LG.Health.hazard(n.age, n.health, n.gender) * (n.role === 'grandparent' ? 1.2 : 1);
         if (R().chance(p, hz) || n.age >= 102) {
           n.alive = false; n.diedAt = p.age;
           const label = Rel.ROLE_LABEL[n.role] || '';
@@ -179,7 +199,7 @@
           }
           // 상속: 부모 세대가 모두 떠났을 때
           if (PARENT_ROLES.indexOf(n.role) >= 0 && !Rel.parents(p).length && !S.has(p, 'inherited') && p.age >= 20) {
-            const base = { 1: 0, 2: 800, 3: 4000, 4: 15000, 5: 50000 }[p.family.tier] || 0;
+            const base = ({ 1: 0, 2: 600, 3: 3000, 4: 12000, 5: 40000 }[p.family.tier] || 0) * LG.Birth.giftMul(p);
             const sib = p.people.filter(x => x.role === 'sibling').length;
             const amt = Math.round(base * R().float(p, 0.6, 1.4) / (sib + 1) / 100) * 100;
             if (amt > 0) {
@@ -230,11 +250,17 @@
         if (S.has(p, 'abroad_alone')) d -= 2;
         c.rel = U().clamp(c.rel + d, 0, 100);
         if (c.age === 8) lines.push({ t: `${c.name}이(가) 초등학교에 입학했다.`, icon: '🎒' });
-        if (c.age === 20) {
-          c.edu = R().int(p, 30, 90);
+        // 자녀의 입시: 열아홉 살에 부모로서의 선택(k_child_csat)이 기다린다 → 결과는 그동안의 교육(c.plan)·관계·형편이 만든다
+        if (c.age === 19 && !c.uni) p.queue.push({ id: 'k_child_csat', at: p.age });
+        if (c.age === 20 && !c.uni) {
+          c.edu = R().int(p, 30, 90); c.uni = c.edu > 55 ? 'univ' : 'work';
           lines.push({ t: c.edu > 55 ? `${c.name}이(가) 대학에 합격했다.` : `${c.name}이(가) 자기 길을 찾아 일을 시작했다.`, icon: '🎓', major: true });
         }
-        if (c.age === 26) { c.job = Rel.randomJobFor(p, 26); c.income = c.job ? LG.DATA.jobs[c.job].income : 0; }
+        if (c.age === 26) {
+          c.job = c.uni === 'arts' ? R().pick(p, ['artist', 'musician', 'designer', 'creator']) : c.uni === 'top' ? R().pick(p, ['office_big', 'developer', 'researcher', 'doctor', 'lawyer']) : c.uni === 'abroad' ? R().pick(p, ['researcher', 'office_big', 'translator', 'developer']) : Rel.randomJobFor(p, 26);
+          c.income = c.job ? LG.DATA.jobs[c.job].income : 0;
+          if (c.uni === 'top' || c.uni === 'abroad') lines.push({ t: `${c.name}이(가) ${LG.DATA.jobs[c.job].name}(으)로 첫 출근을 했다. 그때 들인 시간이 헛되지 않았다.`, icon: '💼', major: true });
+        }
         if (c.age >= 28 && c.age <= 36 && !c.married && R().chance(p, 0.15)) {
           c.married = true;
           lines.push({ t: `${c.name}이(가) 결혼했다. 식장에서 눈물이 났다.`, icon: '💒', major: true });

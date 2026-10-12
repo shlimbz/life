@@ -4,7 +4,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]).filter(s => !s.includes('ui.js') && !s.includes('main.js'));
+const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]).filter(s => !s.startsWith('js/ui/') && !s.includes('ui.js') && !s.includes('main.js'));
 const ctx = { window: {}, console, Math, Date, JSON, Object, Array }; ctx.window = ctx; if (process.env.K) ctx.__K = +process.env.K; vm.createContext(ctx);
 scripts.forEach(s => vm.runInContext(fs.readFileSync(path.join(root, s), 'utf8'), ctx, { filename: s }));
 const LG = ctx.LG, N = +process.argv[2] || 300;

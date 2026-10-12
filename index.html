@@ -44,10 +44,12 @@
       </div>
       <div class="title-bottom">
         <button id="btn-continue" class="btn btn-ghost hidden" type="button"></button>
-        <p class="ask">당신은 태어났다.<br><strong>당신의 성별은?</strong></p>
-        <div class="gender-row">
-          <button class="btn btn-gender" data-gender="M" type="button"><span class="g-ico">♂</span>남성</button>
-          <button class="btn btn-gender" data-gender="F" type="button"><span class="g-ico">♀</span>여성</button>
+        <p class="ask">성별도, 부모도, 태어난 곳도<br><strong>아무도 고를 수 없다.</strong></p>
+        <button id="btn-born" class="btn btn-primary" type="button">태어나기</button>
+        <div class="title-row">
+          <button id="btn-daily" class="tbtn" type="button"><span>📅 오늘의 인생</span><small id="daily-sub">모두 같은 출발점</small></button>
+          <button id="btn-dex" class="tbtn" type="button"><span>📖 도감</span><small id="dex-sub">모은 인생</small></button>
+          <button id="btn-settings" class="tbtn" type="button"><span>⚙️ 설정</span><small>속도 · 글자</small></button>
         </div>
         <p id="past-lives" class="past-lives"></p>
       </div>
@@ -100,11 +102,6 @@
       <div class="end-scroll" id="end-body"></div>
     </section>
 
-    <!-- 이벤트 오버레이 -->
-    <div id="event" class="event-layer hidden" role="dialog" aria-modal="true">
-      <div class="event-card" id="event-card"></div>
-    </div>
-
     <!-- 바텀 시트 -->
     <div id="sheet" class="sheet-layer hidden">
       <div class="sheet-backdrop" data-close></div>
@@ -129,6 +126,7 @@
   <script src="data/flavor-more.js"></script>
   <script src="data/endings.js"></script>
   <script src="js/style.js"></script>
+  <script src="data/event-helpers.js"></script>
   <script src="data/events-early.js"></script>
   <script src="data/events-adult.js"></script>
   <script src="data/events-later.js"></script>
@@ -137,6 +135,15 @@
   <script src="data/events-paths2.js"></script>
   <script src="data/events-paths3.js"></script>
   <script src="data/events-paths4.js"></script>
+  <script src="data/events-global.js"></script>
+  <script src="data/events-talent.js"></script>
+  <script src="data/events-echo.js"></script>
+  <script src="data/events-elder.js"></script>
+  <script src="data/events-society.js"></script>
+  <script src="data/events-health.js"></script>
+  <script src="data/events-spend.js"></script>
+  <script src="data/events-chain.js"></script>
+  <script src="data/events-alt.js"></script>
   <script src="data/events-dark.js"></script>
   <script src="data/events-style.js"></script>
   <!-- 엔진 -->
@@ -153,9 +160,18 @@
   <script src="js/life.js"></script>
   <script src="js/timeline.js"></script>
   <script src="js/event-engine.js"></script>
+  <script src="js/dex.js"></script>
+  <script src="js/disease.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/game.js"></script>
   <!-- 화면 -->
-  <script src="js/ui.js"></script>
+  <script src="js/ui/kit.js"></script>
+  <script src="js/ui/core.js"></script>
+  <script src="js/ui/play.js"></script>
+  <script src="js/ui/event.js"></script>
+  <script src="js/ui/sheets.js"></script>
+  <script src="js/ui/title.js"></script>
+  <script src="js/ui/end.js"></script>
+  <script src="js/ui/boot.js"></script>
 </body>
 </html>

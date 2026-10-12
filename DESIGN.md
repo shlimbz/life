@@ -1,4 +1,6 @@
-# 대한민국 인생게임 — 설계 문서 (V1)
+# 대한민국 인생게임 — 설계 문서 (V1, 이후 변경은 README의 버전별 절 참고)
+
+> 현재 목표치: 한 판 선택 25~32회(현재 중앙 약 31회), 엔딩 한 줄 평 최대 14%(현재 13%), 평균 사망 나이 남 약 80 · 여 약 85.5세
 
 > **"태어나는 것은 랜덤, 살아가는 것은 선택, 결과는 현실과 운이 결정하는 대한민국 인생 시뮬레이션."**
 
@@ -26,7 +28,7 @@
 | 시스템 | 파일 | 역할 |
 |---|---|---|
 | A. PlayerState | `js/state.js` | 모든 게임 상태의 단일 객체. 저장/복원 단위 |
-| B. BirthGenerator | `js/birth.js` | 성별 외 모든 출생 조건 랜덤 생성, 장단점 서술 |
+| B. BirthGenerator | `js/birth.js` | 성별을 포함한 모든 출생 조건을 시드로 생성, 장단점 서술 |
 | C. EventSystem | `js/event-engine.js` | 나이·조건·플래그·쿨다운으로 이벤트 필터, 가중치 선택, 예약 이벤트 |
 | D. ChoiceSystem | `js/event-engine.js` | 선택지 노출 조건, 의도(intent) 기록, 가능성 라벨 |
 | E. ProbabilitySystem | `js/probability.js` | 기본확률 + 요인(능력/환경/경제/관계/과거/재능/노력/건강/성격) + 숨은 운 |
@@ -68,7 +70,7 @@
 
 ## 3. 출생 생성 규칙
 
-1. 성별(플레이어 선택) → 2. 출생연도(1988~2010) → 3. 지역(인구 가중치 17개 시·도)
+1. 성별(시드에서 결정, 남 51.2%) → 2. 출생연도(1988~2010) → 3. 지역(인구 가중치 17개 시·도)
 4. 도시/농촌(지역 도시화율) → 5. 가족 형태(양부모 68 / 편모 9 / 편부 4 / 조부모 동거 10 / 다자녀 등 태그)
 6. 가정 형편 1~5단계 (지역 편향 + 정규분포; 서울=부자 같은 고정 공식은 없음)
 7. 부모 NPC(나이·직업·소득·학력·건강·성격·지원성향) → 8. 형제(0~3)
@@ -128,7 +130,7 @@
 ## 6. 모바일 화면 구조 (390×844 기준)
 
 ```
-타이틀(성별 선택) → 출생 공개(순차 연출) → 플레이 화면 ⇄ 이벤트 오버레이 → 사망 연출 → 결과 카드
+타이틀(태어나기 · 오늘의 인생 · 도감 · 설정) → 출생 공개(순차 연출) → 플레이 화면 ⇄ 이벤트 오버레이 → 사망 연출 → 결과 카드
 플레이 화면:
  ┌ 헤더: 나이(대형) · 연도 · 인생 진행바 · 속도/일시정지
  ├ 현재 상황 카드: 최근 사건 · 💼직업 🏠집 ❤️관계
@@ -174,10 +176,11 @@ tick(): 1년 경과
 
 ```
 index.html  style.css  manifest.webmanifest  icon.svg  README.md  DESIGN.md
-data/  names.js regions.js jobs.js talents.js traits.js flavor.js endings.js
-       events-early.js events-adult.js events-later.js
-js/    rng.js state.js birth.js probability.js outcome.js relationship.js economy.js
-       health.js life.js timeline.js event-engine.js storage.js ui.js game.js
-tools/ simulate.js   (Node로 수백 판 자동 플레이 → 밸런스 리포트)
+data/  names.js regions.js jobs.js talents.js traits.js flavor*.js endings.js event-helpers.js
+       events-*.js (early adult later paths~4 money dark style global talent echo elder society)
+js/    rng.js state.js birth.js probability.js outcome.js relationship.js economy.js affinity.js invest.js
+       style.js health.js life.js timeline.js event-engine.js dex.js storage.js game.js
+js/ui/ kit.js core.js play.js event.js sheets.js title.js end.js boot.js
+tools/ check.js (자동 검사) · simulate.js · review.js · wealth.js
 ```
 모든 스크립트는 일반 `<script>`(모듈 아님)로 로드 → 빌드 없이 GitHub Pages / Vercel 정적 배포, `file://`로도 실행 가능.

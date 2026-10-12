@@ -4,11 +4,11 @@
 (function (LG) {
   const E = LG.DATA.events;
   const H = LG.EH, has = H.has, found = H.found, seq = H.seq, disc = H.disc;
-  const A = (p, d) => LG.Aff.get(p, d);
-  const jobIs = (p, ...ids) => !!p.job && ids.indexOf(p.job.id) >= 0;
-  const parentJob = (p, ...ids) => LG.Rel.parents(p).some(n => ids.indexOf(n.job) >= 0);
+  const A = H.A;
+  const jobIs = H.jobIs;
+  const parentJob = H.parentJob;
   const kids = H.kids;
-  const S = () => LG.State;
+  const S = H.S;
 
   // ═════════════════════════ 운동 · 체육 ═════════════════════════
 
@@ -125,6 +125,7 @@
   E.push({
     id: 'sp_kids_team', cat: 'sports', tier: 'choice', ages: [33, 58], w: 10, max: 1, dom: ['sports'], icon: '⚽',
     if: p => A(p, 'sports') >= 40 && kids(p).some(c => c.age >= 8 && c.age <= 15),
+    child: p => kids(p).find(c => c.age >= 8 && c.age <= 15),
     label: '가족', title: '유소년 팀 코치',
     text: '{child}가 다니는 유소년 클럽에서 코치를 구하고 있다. "예전에 선수 하셨다면서요? 딱 맞으시겠어요."',
     choices: [
@@ -467,7 +468,7 @@
       { id: 'go', label: '서울로 올라간다', intent: 'adventure',
         check: { base: 56, partial: 0.4, f: [['stat', 'social', 0.2], ['assets', 0.3], ['stat', 'mental', 0.2]] },
         out: {
-          success: { t: '캐리어를 끌고 낯선 역에 내렸다. 월세는 비쌌지만 기회는 훨씬 많았다.', log: '서울 상경', liveIn: 'seoul', home: 'rent', exp: 3, hp: 6, fn: p => { if (p.job) p.job.mul = Math.min(LG.Economy.maxMul(p.job.id), p.job.mul * 1.1); return ''; } },
+          success: { t: '캐리어를 끌고 낯선 역에 내렸다. 월세는 비쌌지만 기회는 훨씬 많았다.', log: '서울 상경', liveIn: 'seoul', home: 'rent', exp: 3, hp: 6, fn: p => { if (p.job) p.job.mul = Math.min(LG.Economy.maxMul(p.job.id, p), p.job.mul * 1.1); return ''; } },
           partial: { t: '고시원 같은 방에서 시작했다. 고단하지만 도시의 속도에 적응 중이다.', liveIn: 'seoul', home: 'rent', exp: 2, sr: 8 },
           fail: { t: '집 구하기부터 막혔다. 한 달 만에 고향으로 돌아왔다.', hp: -6, money: -300 }
         } },
@@ -721,6 +722,7 @@
   E.push({
     id: 'cb_kid_arts', cat: 'child', tier: 'choice', ages: [36, 60], w: 14, max: 1, icon: '🎻',
     if: p => has(p, 'kid_arts') && kids(p).some(c => c.age >= 11 && c.age <= 19),
+    child: p => kids(p).filter(c => c.age >= 11 && c.age <= 19).sort((a, b) => (b.plan === 'arts') - (a.plan === 'arts'))[0],
     label: '자녀', title: '{child}의 콩쿠르',
     text: '예체능을 지원해 준 {child}가 처음으로 큰 대회에 나가게 되었다. 레슨비가 만만치 않은 시점이다.',
     choices: [

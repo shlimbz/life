@@ -110,18 +110,19 @@
   });
 
   // ───────────────────────── 자동 이벤트 ─────────────────────────
-  const auto = (o) => E.push(Object.assign({ tier: 'auto' }, o));
+  const auto = H.pusher({ tier: 'auto' });
 
   auto({ id: 'a_sick_child', cat: 'health', ages: [1, 9], w: 4, max: 1, icon: '🤒',
     check: { base: 72, f: [['region', 'medical', 0.4], ['family', 0.3]] },
     out: { success: { t: '심한 폐렴에 걸렸지만 금방 나았다.', st: { health: -2 } }, fail: { t: '오랫동안 병원 신세를 졌다. 몸이 약한 아이로 자랐다.', log: '어린 시절 큰 병치레', major: true, st: { health: -10 } } } });
 
-  auto({ id: 'a_family_trip', cat: 'family', ages: [4, 15], w: 6, cd: 4, icon: '🏖️',
+  auto({ id: 'a_family_trip', cat: 'family', ages: [4, 15], w: 6, cd: 4, max: 2, icon: '🏖️',
     if: p => p.family.tier >= 2,
-    auto: { t: p => p.family.tier >= 4 ? '가족과 해외여행을 다녀왔다. 비행기 창밖 구름이 신기했다.' : '가족과 바다에 다녀왔다. 오래 기억에 남을 여름이다.', hp: 6, rel: { parents: 4 }, exp: 2 } });
+    auto: { t: p => (p.done.a_family_trip || 0) ? (p.family.tier >= 4 ? '이번 여름엔 가족과 유럽에 다녀왔다. 사진 속 나는 늘 졸린 얼굴이다.' : p.urban ? '가족과 계곡에 텐트를 쳤다. 아버지가 끓인 라면이 세상에서 제일 맛있었다.' : '가족과 서울 구경을 다녀왔다. 지하철이 미로 같았다.') : (p.family.tier >= 4 ? '가족과 해외여행을 다녀왔다. 비행기 창밖 구름이 신기했다.' : '가족과 바다에 다녀왔다. 오래 기억에 남을 여름이다.'), hp: 6, rel: { parents: 4 }, exp: 2 } });
 
   auto({ id: 'a_parents_divorce', cat: 'family', ages: [6, 17], w: 5, max: 1, icon: '💔',
-    if: p => p.family.tags.indexOf('conflict') >= 0 && !!H.rel(p, 'father') && !!H.rel(p, 'mother'),
+    // 다툼(c_parents_fight)을 먼저 겪은 뒤에야 이혼이 온다 — 갑작스러운 이혼으로 이야기가 끊기지 않게
+    if: p => p.family.tags.indexOf('conflict') >= 0 && !!H.rel(p, 'father') && !!H.rel(p, 'mother') && !!p.done.c_parents_fight && p.age - (p.catLast.family || 0) >= 1,
     auto: { t: '부모님이 이혼하셨다. 집이 갑자기 넓어진 것 같다.', log: '부모님의 이혼', major: true, hp: -14, sr: 14, fn: H.parentsDivorce } });
 
   auto({ id: 'a_moving', cat: 'family', ages: [5, 14], w: 2, max: 1, icon: '📦',
@@ -155,10 +156,10 @@
     if: p => has(p, 'pet'),
     auto: { t: '콩이가 무지개다리를 건넜다. 한참을 울었다.', log: '반려견 콩이와 이별', major: true, hp: -12, unflag: 'pet' } });
 
-  auto({ id: 'a_bonus', cat: 'money', ages: [24, 62], w: 3, cd: 3, icon: '💵',
+  auto({ id: 'a_bonus', cat: 'money', ages: [24, 62], w: 3, cd: 5, max: 4, icon: '💵',
     if: p => !!p.job && ['office_big', 'developer', 'researcher', 'office_small', 'technician', 'lawyer', 'doctor'].indexOf(p.job.id) >= 0,
     check: { base: 38, f: [['perf', 0.6]] },
-    out: { success: { t: '', hp: 6, fn: p => { const a = Math.round(LG.Economy.salary(p) * 0.15 / 10) * 10; p.money += a; return `성과급 ${LG.U.money(a)}원이 나왔다!`; } }, fail: { skip: true } } });
+    out: { success: { t: '', hp: 6, fn: p => { const a = Math.round(LG.Economy.salary(p) * 0.15 / 10) * 10; p.money += a; return [`성과급 ${LG.U.money(a)}원이 나왔다!`, `올해 고생한 보람이 있었다. 성과급 ${LG.U.money(a)}원.`, `팀 성과가 좋았다. 성과급 ${LG.U.money(a)}원이 들어왔다.`, `성과급 ${LG.U.money(a)}원. 그동안 미뤄 둔 걸 하나 질렀다.`][(p.done.a_bonus || 0) % 4]; } }, fail: { skip: true } } });
 
   auto({ id: 'a_parent_support', cat: 'family', ages: [30, 60], w: 3, max: 1, icon: '🧧',
     if: p => !!p.job && p.family.tier <= 2 && LG.Rel.parents(p).length > 0 && !has(p, 'supporting_parents'),
@@ -169,10 +170,12 @@
 
   auto({ id: 'a_child_teen', cat: 'child', ages: [40, 65], w: 4, max: 1, icon: '🚪',
     if: p => H.kids(p).some(c => c.age >= 13 && c.age <= 17),
+    child: p => H.kids(p).find(c => c.age >= 13 && c.age <= 17),
     auto: { t: '{child}이(가) 사춘기를 심하게 앓고 있다. 방문이 쾅 닫힌다.', rel: { children: -6 }, sr: 6 } });
 
   auto({ id: 'a_child_proud', cat: 'child', ages: [45, 80], w: 3, max: 1, icon: '🥇',
     if: p => H.kids(p).some(c => c.age >= 22 && c.age <= 35 && c.rel >= 60),
+    child: p => H.kids(p).find(c => c.age >= 22 && c.age <= 35 && c.rel >= 60),
     auto: { t: '{child}이(가) 첫 월급으로 용돈을 보내왔다. 괜히 눈물이 났다.', hp: 10, rel: { children: 4 } } });
 
   auto({ id: 'a_accident', cat: 'accident', ages: [16, 85], w: 1.2, cd: 12, icon: '🚑',

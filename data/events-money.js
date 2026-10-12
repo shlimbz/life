@@ -151,7 +151,7 @@
     ]
   });
 
-  const auto = o => E.push(Object.assign({ tier: 'auto' }, o));
+  const auto = H.pusher({ tier: 'auto' });
   auto({ id: 'm_redevelop', cat: 'money', ages: [35, 78], w: 3, max: 1, icon: '🏗️',
     if: p => !!p.house,
     auto: { t: '동네에 재개발 소식이 돌더니 현실이 됐다. 집값이 껑충 뛰었다.', log: '재개발로 집값 상승', major: true, hp: 8, fn: p => { p.house.value = Math.round(p.house.value * 1.35); return ''; } } });

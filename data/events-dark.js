@@ -6,13 +6,13 @@
 (function (LG) {
   const E = LG.DATA.events;
   const H = LG.EH, has = H.has, disc = H.disc;
-  const S = () => LG.State;
-  const tr = (p, t) => S().hasTrait(p, t);
-  const poor = p => p.family.tier <= 2;
+  const S = H.S;
+  const tr = H.tr;
+  const poor = H.poor;
   const conflict = p => p.family.tags.indexOf('conflict') >= 0 || p.family.tags.indexOf('divorced_parents') >= 0 || has(p, 'parents_divorced');
-  const jobIs = (p, ...ids) => !!p.job && ids.indexOf(p.job.id) >= 0;
-  const auto = o => E.push(Object.assign({ tier: 'auto', cat: 'hardship' }, o));
-  const ch = o => E.push(Object.assign({ tier: 'choice', cat: 'hardship', label: '시련' }, o));
+  const jobIs = H.jobIs;
+  const auto = H.pusher({ tier: 'auto', cat: 'hardship' });
+  const ch = H.pusher({ tier: 'choice', cat: 'hardship', label: '시련' });
   const jp = m => p => { p.family.tier = Math.max(1, p.family.tier - m); return ''; };
 
   // ═════════════════════════ 학창 시절 ═════════════════════════
