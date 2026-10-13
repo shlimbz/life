@@ -349,8 +349,8 @@
   });
 
   ch({
-    id: 'd_gambling', risk: 0.3, ages: [21, 56], w: p => 1.3 + (tr(p, 'impulsive') ? 2 : 0) + (p.money > 800 ? 0.5 : 0) + (p.stress > 55 ? 0.8 : 0) + (has(p, 'gambler') ? 1 : 0), cd: 8, max: 1, icon: '🎲',
-    if: p => p.age >= 21 && p.money >= 100,
+    id: 'd_gambling', risk: 0.3, ages: [21, 56], w: p => 1.3 + (tr(p, 'impulsive') ? 2 : 0) + (H.cash(p) > 800 ? 0.5 : 0) + (p.stress > 55 ? 0.8 : 0) + (has(p, 'gambler') ? 1 : 0), cd: 8, max: 1, icon: '🎲',
+    if: p => p.age >= 21 && H.cash(p) >= 100,
     title: '손쉬운 한 방', text: '직장 동료가 합법이라며 스포츠 베팅(혹은 불법 사이트) 이야기를 꺼냈다. "첫 달에 200 땄어." 휴대폰 화면에 화려한 배당표가 번쩍인다.',
     choices: [
       { id: 'try', label: '소액으로만 해 본다', intent: 'risk',
@@ -405,8 +405,8 @@
   });
 
   ch({
-    id: 'd_loan_shark', risk: 1, ages: [22, 52], w: p => (p.debt > 3000 || p.money < -300 ? 2.8 : 0) + (poor(p) && p.money < 300 ? 1 : 0), cd: 9, max: 1, icon: '💸',
-    if: p => p.debt > 2500 || p.money < 200,
+    id: 'd_loan_shark', risk: 1, ages: [22, 52], w: p => (p.debt > 3000 || p.money < -300 ? 2.8 : 0) + (poor(p) && H.cash(p) < 300 ? 1 : 0), cd: 9, max: 1, icon: '💸',
+    if: p => p.debt > 2500 || H.cash(p) < 200,
     title: '급전의 유혹', text: '카드값과 월세가 겹쳐 당장 돈이 모자란다. 문자로 "당일 대출·무심사·신용불량 OK"라는 광고가 쉴 새 없이 온다. 은행은 문턱이 높다.',
     choices: [
       { id: 'family', label: '가족·지인에게 어렵게 부탁한다', intent: 'family',
@@ -436,7 +436,7 @@
       { id: 'clinic', label: '정신건강의학과를 찾는다', intent: 'health',
         out: { t: '진료실에 들어가기까지 한 시간이 걸렸다. 의사는 "충분히 나아질 수 있어요"라고 말했다. 약과 상담이 조금씩 효과를 냈다.', log: '우울증 치료를 시작', flag: 'counseled', hp: 6, sr: -10, st: { mental: 3 }, money: -120 } },
       { id: 'talk', label: '가까운 사람에게 털어놓는다', intent: 'family',
-        check: { base: 55, partial: 0.4, f: [['support', 0.3], ['rel', 'friends', 0.1]] },
+        check: { base: 55, partial: 0.4, f: [['support', 0.3], ['rel', 'friend', 0.1]] },
         out: {
           success: { t: '울면서 털어놓았다. 상대는 아무 말 없이 내 손을 잡아 주었다. 그것만으로도 한결 가벼워졌다.', hp: 6, sr: -6, rel: { friends: 4 } },
           partial: { t: '"기운 내"라는 말만 돌아왔다. 그래도 말을 꺼낸 건 처음이었다.', hp: 1, sr: 2 },

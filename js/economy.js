@@ -67,8 +67,12 @@
     p.lastPropRent = 0;
     if (p.prop && p.prop.yield) { const r = Math.round(p.prop.value * p.prop.yield * (R().chance(p, 0.12) ? 0.4 : 1)); income += r; p.lastPropRent = r; }
     if (p.status === 'retired') income = pension(p) + (p.bldg ? p.lastRent : 0) + p.lastPropRent;
+    // 주택연금 지급분 (집값의 약 3%/년, 받은 만큼 집에 대한 빚으로 쌓인다)
+    if (S().has(p, 'reverse_mortgage') && p.house) { const hp = Math.round(p.house.value * 0.03); income += hp; LG.Loans.add(p, 'hpension', hp); }
     else if (p.age >= 65 && !p.job) income = Math.max(income, 360); // 기초연금
-    if (sp && sp.income && sp.alive) income += Math.round(sp.income * (sp.job ? 1 : 0.6));
+    const spInc = sp && sp.income && sp.alive ? Math.round(sp.income * (sp.job ? 1 : 0.6)) : 0;
+    p.incomeParts = { me: income - (p.lastRent && p.bldg ? p.lastRent : 0) - p.lastPropRent, spouse: spInc, rent: (p.bldg ? p.lastRent || 0 : 0) + p.lastPropRent };
+    income += spInc;
 
     // 세금·4대보험 (누진 근사) + 소득이 늘면 씀씀이도 는다
     const tax = x => x * 0.11 + Math.max(0, x - 5000) * 0.14 + Math.max(0, x - 10000) * 0.12;
@@ -115,7 +119,15 @@
     if (S().has(p, 'cancer_insured') && p.dz && p.dz.cancer && p.dz.cancer.since === p.age && !p.dz.cancer.paid) { p.dz.cancer.paid = true; p.money += 3000; lines.push({ t: '암보험 진단비 3,000만 원이 나왔다. 미리 들어 둔 보험이 이렇게 고마울 줄이야.', icon: '📄' }); }
     if (p.status === 'retired' || p.age >= 70) cost *= 0.96;
     // 재량 지출(외식·여가·쇼핑)은 꼭 나가야 할 돈을 다 내고 '남는 돈'에서 쓴다 → 벌이가 충분한데 빚이 쌓이는 일이 없게
-    cost += Math.max(0, income - cost) * mc * SM.cost + (p.job || p.status === 'retired' ? income * SM.extra : 0);
+    // (올해 갚아야 할 대출 원리금도 '꼭 나가는 돈'으로 먼저 빼 둔다 → 상환일에 돈이 모자라 연체되는 일이 줄어든다)
+    const dueEst = LG.Loans.dueEstimate(p);
+    cost += Math.max(0, income - cost - dueEst) * mc * SM.cost + (p.job || p.status === 'retired' ? income * SM.extra : 0);
+    // 모아 둔 돈이 많으면 씀씀이도 커진다(자산 효과). 은퇴 뒤에는 모은 돈을 조금씩 헐어 쓰고 자녀·손주에게도 쓴다
+    {
+      const fin = Math.max(0, p.money) + (LG.Invest ? LG.Invest.total(p) : 0);
+      const rate = p.age >= 75 ? 0.06 : p.age >= 62 ? 0.045 : p.age >= 45 ? 0.02 : 0.012;
+      cost += Math.max(0, fin - 5000) * rate * SM.cost;
+    }
 
     // 통장이 비고 빚이 있으면 씀씀이를 벌이에 맞춘다 (빚으로 생활비를 계속 메우지 않는다)
     if (p.money <= 0 && p.debt > 0 && cost > income) cost = income + (cost - income) * (p.age >= 60 ? 0.2 : 0.45);
@@ -154,15 +166,28 @@
     if (p.money < 0 && LG.Invest) LG.Invest.raise(p, -p.money);
     if (p.money < 0) {
       const need = -p.money; p.money = 0;
-      LG.Loans.borrow(p, need);
+      // 대학생의 생활비 부족분은 학자금(생활비) 대출로, 그 밖에는 카드론 → (밀리면) 대부업 순
+      if (p.status === 'college' || p.status === 'grad') LG.Loans.add(p, 'student', need); else LG.Loans.borrow(p, need);
       if (!p.cool.debtMsg || p.cool.debtMsg <= p.age) {
         lines.push({ t: R().pick(p, ['통장 잔고가 바닥났다. 카드론으로 생활비를 메우는 중이다.', '월말마다 카드값이 먼저 보인다. 빚으로 한 달을 넘기는 날이 늘었다.', '잔고가 비어 간다. 대출 앱을 여는 손이 점점 익숙해진다.']), icon: '💸', fx: `새 빚 +${U().money(need)}` });
         p.cool.debtMsg = p.age + 4;
       }
     }
+    // 주택연금: 60세가 넘어 모아 둔 돈 없이 빚에 쫓기면, 집을 담보로 빚을 정리하고 평생 연금을 받는다 (집에서 계속 산다)
+    if (p.age >= 60 && p.house && !S().has(p, 'reverse_mortgage') && Math.max(0, p.money) + (LG.Invest ? LG.Invest.total(p) : 0) < 500
+        && LG.Loans.amount(p, 'credit') + LG.Loans.amount(p, 'private') + LG.Loans.amount(p, 'mortgage') > 0) {
+      S().flag(p, 'reverse_mortgage');
+      const owe = LG.Loans.amount(p, 'credit') + LG.Loans.amount(p, 'private') + LG.Loans.amount(p, 'mortgage');
+      const lump = Math.min(owe, Math.round(p.house.value * 0.5));
+      LG.Loans.pay(p, lump, ['private', 'credit', 'mortgage']);
+      LG.Loans.add(p, 'hpension', lump);
+      lines.push({ t: `주택연금에 가입했다. 집을 담보로 빚 ${U().money(lump)}원을 정리하고, 이 집에 계속 살면서 매달 연금을 받는다.`, icon: '🏡', major: true, fx: `빚 정리 ${U().money(lump)} · 스트레스 -8` });
+      S().addStat(p, 'stress', -8); S().addStat(p, 'happy', 4);
+    }
     // 부동산(집 · 투자용 부동산 · 건물) 값은 부동산 시장을 따라 움직인다 (LG.Invest.realEstate)
     // 감당 못 할 빚 → 집을 팔아 정리 (빚이 연 소득의 6배를 넘고 집값의 70%를 넘을 때)
-    if (p.house && p.debt > Math.max(income * 6, 10000) && p.debt > p.house.value * 0.7) {
+    const debtX = p.debt - LG.Loans.amount(p, 'hpension');
+    if (p.house && debtX > Math.max(income * 6, 10000) && debtX > p.house.value * 0.7) {
       const v = p.house.value; p.house = null; p.home = 'rent';
       const paid = LG.Loans.pay(p, Math.min(v, p.debt));
       p.money += Math.max(0, v - paid);
@@ -172,7 +197,7 @@
     // 빚 스트레스
     const yearlyBase = Math.max(income, 1500);
     // 무거운 빚: 집을 담보로 한 정상적인 대출은 빼고 본다 (주담대가 소득의 몇 배인 건 흔한 일)
-    const L2 = LG.Loans, longDebt = L2.amount(p, 'mortgage') + L2.amount(p, 'jeonse') + L2.amount(p, 'deposit') + L2.amount(p, 'prop');
+    const L2 = LG.Loans, longDebt = L2.amount(p, 'mortgage') + L2.amount(p, 'jeonse') + L2.amount(p, 'deposit') + L2.amount(p, 'prop') + L2.amount(p, 'hpension');
     if (p.debt - longDebt > yearlyBase * 2.5 || p.debt > yearlyBase * 9 || L2.amount(p, 'private') > 0) { S().addStat(p, 'stress', 5); S().addStat(p, 'happy', -2); S().flag(p, 'heavy_debt'); }
     else S().unflag(p, 'heavy_debt');
     p.lastNet = net - loanPaid; p.lastIncome = income; p.lastLoanOut = loanPaid;

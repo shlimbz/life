@@ -98,13 +98,28 @@
         <div class="as-legend">${rows.filter(r => r.v > 0 || ['cash', 'deposit', 'stock'].indexOf(r.k) >= 0).map(r => `<div><i style="background:${colors[r.k]}"></i><span>${r.icon} ${r.name}</span><b>${U.money(r.v)}</b><small>${Math.round(r.v / tot * 100)}%</small></div>`).join('')}
           ${p.debt > 0 ? `<div class="debt"><i style="background:#ef6b6b"></i><span>🧾 빚</span><b>-${U.money(p.debt)}</b><small></small></div>` : ''}</div>
       </div>
+      ${(() => { const ip = p.incomeParts; if (!ip || p.age < 19) return '';
+        const m = v => U.money(Math.round(v / 12));
+        return `<h3 class="sh-sec">월 수입 (세전)</h3><div class="card">
+          <div class="row"><span>${p.job ? '💼 내 월급' : p.status === 'retired' ? '🧓 연금' : '💼 내 소득'}</span><b>${m(Math.max(0, ip.me))}원</b></div>
+          ${ip.spouse > 0 ? `<div class="row"><span>💍 배우자 월급</span><b>${m(ip.spouse)}원</b></div>` : ''}
+          ${ip.rent > 0 ? `<div class="row"><span>🏢 월세·임대 수입</span><b>${m(ip.rent)}원</b></div>` : ''}
+          <div class="row"><span>합계</span><b>${m(p.lastIncome || 0)}원</b></div>
+          <p class="as-note" style="margin:6px 0 0">세금·4대보험을 떼기 전 금액입니다. 생활비·주거비·자녀·대출 상환을 빼고 남는 돈이 '월 저축'이에요.</p></div>`; })()}
       ${(() => { const L = LG.Loans.list(p); if (!L.length) return ''; const yr = L.reduce((a, l) => a + Math.round(l.amt * l.rate), 0);
         return `<h3 class="sh-sec">빚 (대출 종류별)</h3><div class="card loans">${L.map(l => `<div class="row${l.regular ? '' : ' bad'}"><span>${l.icon} ${esc(l.name)}${l.late ? ` <em class="late">연체 ${l.late}년</em>` : ''}</span><b>${U.money(l.amt)}원</b><small>연 ${(l.rate * 100).toFixed(1)}%${l.k === 'deposit' ? ' · 집을 팔 때 돌려줌' : ` · ${l.left}년 남음`}</small></div>`).join('')}
           <p class="as-note" style="margin:6px 0 0">해마다 이자 약 ${U.money(yr)}원. 정해진 원금을 갚고, 남는 돈으로 <b>금리가 높은 빚부터</b> 먼저 갚습니다. 카드론·대부업은 연체되면 바로 독촉이 옵니다.</p></div>`; })()}
       <h3 class="sh-sec">돈을 굴리는 방식</h3>
       ${canInvest ? '' : '<p class="empty">아직은 돈을 굴릴 나이가 아니다.</p>'}
-      <div class="pol-list ${canInvest ? '' : 'off'}">${Object.keys(I.POLICY).map(k => { const o = I.POLICY[k]; return `<button class="pol ${pol === k && p.invPolicy ? 'on' : ''}" data-pol="${k}" type="button"><span class="pi">${o.icon}</span><span class="pt"><b>${o.name}</b><small>${o.desc}</small></span></button>`; }).join('')}</div>
-      <p class="as-note">생활 예비자금(약 ${U.money(I.reserve(p))})은 현금으로 남겨 두고, 그 위로 남는 돈을 위 비율대로 굴립니다. 방식을 바꾸면 보유 자산도 새 비율로 다시 배분돼요.</p>
+      ${(() => { const w = I.weights(p); const sum = I.KEYS.reduce((a, k) => a + (w[k] || 0), 0);
+        return `<div class="card alloc ${canInvest ? '' : 'off'}">
+          ${I.KEYS.map(k => `<label class="al-row"><span>${I.CLASSES[k].icon} ${I.CLASSES[k].name}</span><input type="range" min="0" max="100" step="5" value="${w[k] || 0}" data-k="${k}" ${canInvest ? '' : 'disabled'}><b data-v="${k}">${w[k] || 0}%</b></label>`).join('')}
+          <div class="al-row cash"><span>👛 현금으로 두기</span><i class="al-bar"><em style="width:${100 - sum}%"></em></i><b id="al-cash">${100 - sum}%</b></div>
+          <button class="al-apply" type="button" ${canInvest ? '' : 'disabled'}>이 비율로 굴리기</button>
+        </div>`; })()}
+      <p class="as-note">생활 예비자금(약 ${U.money(I.reserve(p))})을 뺀 '굴릴 수 있는 돈' 중 몇 %를 어디에 둘지 정합니다. 합이 100%보다 작으면 나머지는 현금으로 남아요. 적용하면 지금 가진 투자 자산도 새 비율로 다시 나눕니다.</p>
+      <h3 class="sh-sec">빠르게 고르기</h3>
+      <div class="pol-list ${canInvest ? '' : 'off'}">${Object.keys(I.POLICY).filter(k => k !== 'custom').map(k => { const o = I.POLICY[k]; return `<button class="pol ${pol === k && p.invPolicy ? 'on' : ''}" data-pol="${k}" type="button"><span class="pi">${o.icon}</span><span class="pt"><b>${o.name}</b><small>${o.desc}</small></span></button>`; }).join('')}</div>
       <h3 class="sh-sec">시장</h3>
       <div class="card">
         ${m ? `<div class="row"><span>증시</span><b>${I.REGIME_NAME[m.regime]} · 지난해 ${m.stockRet >= 0 ? '+' : ''}${Math.round(m.stockRet * 100)}%</b></div>
@@ -119,6 +134,26 @@
   }
   function bindAsset() {
     let p = K.p;
+    const I = LG.Invest;
+    const sliders = $$('#sheet-body .alloc input[type=range]');
+    const sync = moved => {
+      let sum = sliders.reduce((a, s) => a + +s.value, 0);
+      if (sum > 100 && moved) { moved.value = Math.max(0, +moved.value - (sum - 100)); sum = 100; }
+      sliders.forEach(s => { $(`#sheet-body [data-v="${s.dataset.k}"]`).textContent = s.value + '%'; });
+      const left = 100 - sliders.reduce((a, s) => a + +s.value, 0);
+      $('#al-cash').textContent = left + '%';
+      const bar = $('#sheet-body .al-bar em'); if (bar) bar.style.width = left + '%';
+    };
+    sliders.forEach(s => s.addEventListener('input', () => sync(s)));
+    const ap = $('#sheet-body .al-apply');
+    if (ap) ap.addEventListener('click', () => {
+      if (p.age < 19) return;
+      const w = {}; sliders.forEach(s => { w[s.dataset.k] = +s.value; });
+      I.setWeights(p, w, true);
+      saveNow();
+      $('#sheet-body').innerHTML = assetHTML(); bindAsset();
+      toast(`비율대로 굴립니다 (현금 ${100 - I.KEYS.reduce((a, k) => a + (w[k] || 0), 0)}%)`);
+    });
     $$('#sheet-body .pol').forEach(b => b.addEventListener('click', () => {
       if (p.age < 19) return;
       LG.Invest.setPolicy(p, b.dataset.pol, true);

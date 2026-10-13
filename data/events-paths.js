@@ -584,7 +584,7 @@
 
   E.push({
     id: 'fb_family_debt', cat: 'family', tier: 'major', ages: [19, 32], w: 13, max: 1, icon: '📞',
-    if: p => p.family.tier <= 2 && p.job && p.money >= 500,
+    if: p => p.family.tier <= 2 && p.job && H.cash(p) >= 500,
     label: '가족', title: '집안의 빚',
     text: '{parent}가 전화로 겨우 입을 떼셨다. "미안한데 이번 달 이자가 모자라서… 아니다, 괜찮다."',
     choices: [

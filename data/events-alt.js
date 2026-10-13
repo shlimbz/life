@@ -175,7 +175,7 @@
       { id: 'invest', label: '지인이 권한 투자처에 큰돈을 넣는다', intent: 'risk',
         check: { base: 30, partial: 0, f: [['stat', 'intelligence', 0.25], ['flag', 'investor', 8, '투자 경험']] },
         out: { success: { t: '운 좋게 대박이 났다. 돈이 돈을 번다는 말을 실감했다.', money: 8000, hp: 6 },
-          fail: { t: '사기였다. 지인은 사라졌고, 재산의 절반이 날아갔다.', log: '투자 사기로 재산 절반을 잃음', major: true, hp: -18, sr: 20, fn: p => { p.money = Math.round(p.money * 0.5); if (p.inv) p.inv.stock = Math.round(p.inv.stock * 0.5); return ''; } } } },
+          fail: { t: '사기였다. 지인은 사라졌고, 재산의 절반이 날아갔다.', log: '투자 사기로 재산 절반을 잃음', major: true, hp: -18, sr: 20, fn: p => { p.money = Math.round(p.money * 0.5); if (p.inv) LG.Invest.KEYS.forEach(k => { p.inv[k] = Math.round((p.inv[k] || 0) * 0.5); }); return ''; } } } },
       { id: 'enjoy', label: '눈치 보지 않고 즐긴다', intent: 'rest', out: { t: '세계 일주를 두 번 했다. 사진첩이 열 권이 넘는다.', exp: 10, hp: 8, money: -3000 } },
       { id: 'work', label: '다시 일을 찾는다', intent: 'career', out: { t: '작은 회사를 차려 다시 출근한다. 할 일이 있다는 게 이렇게 좋을 줄이야.', unflag: 'rich_idle', fn: p => { LG.Outcome.setJob(p, 'ceo', { mul: 0.6 }); p.queue.push({ id: 'w_business_check', at: p.age + 3 }); return ''; } } }
     ]

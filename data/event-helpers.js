@@ -25,6 +25,9 @@
     rel: (p, r) => LG.Rel.get(p, r),
     kids: p => LG.Rel.all(p, 'child'),
     single: p => !LG.Rel.get(p, 'partner') && !LG.Rel.get(p, 'spouse'),
+    // 바로 쓸 수 있는 돈 = 통장 현금 + 투자 자산(예적금·주식·코인·리츠). 이벤트의 '돈이 있나?'와 금액 계산은 이걸 기준으로 한다
+    // (현금만 보면 투자해 둔 사람은 늘 '돈이 없는' 사람이 된다 → 0원 증여 같은 문제)
+    cash: p => Math.max(0, p.money) + (LG.Invest ? LG.Invest.total(p) : 0),
     // 아직 발견하지 못한 재능 중 목록에 있는 것을 발견
     disc: (...ts) => p => {
       const t = ts.find(x => tal(p, x) && !found(p, x));

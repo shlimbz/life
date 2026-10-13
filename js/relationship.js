@@ -140,6 +140,8 @@
       LG.State.flag(p, 'divorced');
       // 재산 분할
       p.money = Math.round(p.money * 0.55);
+      if (p.inv) LG.Invest.KEYS.forEach(k => { p.inv[k] = Math.round((p.inv[k] || 0) * 0.55); });
+      if (p.prop) { const eq = p.prop.value - LG.Loans.amount(p, 'prop') - LG.Loans.amount(p, 'deposit'); p.money += Math.round(Math.max(0, eq) * 0.5); LG.Loans.pay(p, LG.Loans.amount(p, 'prop') + LG.Loans.amount(p, 'deposit'), ['prop', 'deposit']); p.prop = null; }
       if (p.house) { const owe = LG.Loans.amount(p, 'mortgage'); LG.Loans.pay(p, Math.min(owe, p.house.value), ['mortgage']); p.money += Math.round(Math.max(0, p.house.value - owe) * 0.5); p.house = null; p.home = 'rent'; }
       Rel.adjust(p, 'children', -8);
       return sp;

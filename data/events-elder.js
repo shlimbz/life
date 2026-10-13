@@ -82,7 +82,7 @@
       { id: 'kids', label: '자녀들에게 공평하게 나눈다', intent: 'family', if: p => kidsAlive(p).length > 0 && !has(p, 'gave_estate'),
         out: { t: '숫자를 몇 번이나 다시 맞췄다. 공평하다는 게 이렇게 어려운 일인 줄 몰랐다.', log: '유언장을 씀', flag: 'will_written', rel: { children: 6 }, hp: 6 } },
       { id: 'give', label: '일부를 사회에 기부하기로 한다', intent: 'social',
-        out: { t: '내 이름이 붙은 장학금이 생긴다고 생각하니 마음이 따뜻해졌다.', log: p => has(p, 'donor') ? '두 번째 기부를 약속함' : '유산 기부를 약속함', flag: ['will_written', 'donor'], achv: 5, hp: 10, fn: p => { const a = Math.round(Math.max(0, p.money) * 0.25 / 100) * 100; p.money -= a; return a > 0 ? `${LG.U.money(a)}원을 약정했다.` : ''; } } },
+        out: { t: '내 이름이 붙은 장학금이 생긴다고 생각하니 마음이 따뜻해졌다.', log: p => has(p, 'donor') ? '두 번째 기부를 약속함' : '유산 기부를 약속함', flag: ['will_written', 'donor'], achv: 5, hp: 10, fn: p => { const a = Math.round(H.cash(p) * 0.25 / 100) * 100; p.money -= a; return a > 0 ? `${LG.U.money(a)}원을 약정했다.` : ''; } } },
       { id: 'letter', label: '돈보다 편지를 남긴다', intent: 'family', out: { t: '재산 목록 대신 한 사람 한 사람에게 편지를 썼다.', log: '가족에게 마지막 편지를 남김', flag: 'will_written', rel: { family: 10 }, hp: 8 } },
       { id: 'spend', label: '다 쓰고 간다', intent: 'rest', out: { t: '"자식들은 자기 힘으로 살 거다." 남은 돈으로 하고 싶던 여행을 예약했다.', flag: 'will_written', hp: 10, exp: 4, money: -800 } }
     ]
@@ -109,9 +109,25 @@
       { id: 'cash', label: '보상금을 받고 떠난다', intent: 'money', if: p => !!p.house,
         out: { t: '보상금을 받아 조용한 동네로 옮겼다. 이웃들과는 뿔뿔이 흩어졌다.', log: '재개발 보상을 받고 이사', rel: { friends: -6 }, hp: 2, fn: p => { const v = Math.round(p.house.value * 1.15); p.money += v; p.house = null; p.home = 'rent'; return `${LG.U.money(v)}원을 손에 쥐었다.`; } } },
       { id: 'stay', label: '분담금을 내고 새 아파트에 들어간다', intent: 'stability', if: p => !!p.house,
-        check: { base: 50, partial: 0.4, f: [['assets', 0.4], ['ageOver', 75, 1.5]] },
-        out: { success: { t: '공사 기간을 버티고 새 아파트에 입주했다. 이 나이에 새집이라니.', log: '재개발 새 아파트 입주', hp: 10, fn: p => { p.house.value = Math.round(p.house.value * 1.5); LG.Loans.add(p, 'mortgage', Math.round(p.house.value * 0.12)); return ''; } },
-          fail: { t: '분담금이 감당되지 않았다. 결국 입주권을 팔았다.', hp: -8, sr: 12, fn: p => { p.money += Math.round(p.house.value * 1.05); p.house = null; p.home = 'rent'; return ''; } } } },
+        // 분담금(집값의 약 25~35%)은 모아 둔 돈 → 투자 자산 → 대출(소득·나이에 맞춘 한도) 순으로 마련한다. 정말 모자랄 때만 입주권을 판다
+        out: { t: '', fn: p => {
+          const M = LG.U.money, fee = Math.round(p.house.value * LG.RNG.float(p, 0.25, 0.35) / 100) * 100;
+          const liquid = Math.max(0, p.money) + LG.Invest.total(p);
+          const loanCap = Math.max(0, Math.round(((p.lastIncome || 0) * (p.age >= 70 ? 2.5 : 4.5) + p.house.value * 0.4) / 100) * 100 - LG.Loans.amount(p, 'mortgage'));
+          if (liquid + loanCap < fee) {
+            const v = Math.round(p.house.value * 1.05); const paid = LG.Loans.pay(p, Math.min(v, LG.Loans.amount(p, 'mortgage')), ['mortgage']);
+            p.money += v - paid; p.house = null; p.home = 'rent'; S().addStat(p, 'happy', -8); S().addStat(p, 'stress', 10);
+            return `분담금 ${M(fee)}원은 모아 둔 돈(${M(liquid)}원)과 대출 한도로도 감당이 안 됐다. 결국 입주권을 ${M(v)}원에 팔았다.`;
+          }
+          const own = Math.min(liquid, fee);
+          if (p.money < own) LG.Invest.raise(p, own - p.money);
+          p.money -= own;
+          const loan = fee - own;
+          if (loan > 0) LG.Loans.add(p, 'mortgage', loan, { term: p.age >= 70 ? 15 : 20 });
+          p.house.value = Math.round((p.house.value + fee) * 1.25);
+          p.house.label = '재개발 새 아파트'; S().addStat(p, 'happy', 10); S().addStat(p, 'stress', 4);
+          return `분담금 ${M(fee)}원 중 ${M(own)}원은 모아 둔 돈으로${loan > 0 ? `, ${M(loan)}원은 대출로` : ''} 냈다. 공사 기간을 버티고 새 아파트에 입주했다. 이 나이에 새집이라니.`;
+        } } },
       { id: 'move', label: '세입자로서 조용히 이사한다', intent: 'stability', if: p => !p.house,
         out: { t: '이삿짐을 싸며 30년 동네와 작별했다. 새 동네는 낯설다.', money: -300, hp: -6, rel: { friends: -4 } } },
       { id: 'fight', label: '주민들과 함께 목소리를 낸다', intent: 'social',

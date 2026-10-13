@@ -140,7 +140,7 @@
       </div>
       <button class="d-money" data-open="asset" type="button" aria-label="자산 관리 열기">
         <div class="mc main" id="mc-nw"><span>순자산 <em>(가진 것 − 빚)</em></span><b>${U.money(nw)}</b></div>
-        <div class="mc"><span>월 수입</span><b>${p.age >= 19 && mi > 0 ? U.money(mi) : '—'}</b><small>${p.age >= 19 && p.lastNet != null ? (p.lastNet >= 0 ? '월 저축 +' : '월 적자 -') + U.money(Math.abs(Math.round(p.lastNet / 12))) : '&nbsp;'}</small></div>
+        <div class="mc"><span>${p.incomeParts && p.incomeParts.spouse > 0 ? '월 수입 <em>(부부 합산)</em>' : '월 수입'}</span><b>${p.age >= 19 && mi > 0 ? U.money(mi) : '—'}</b><small>${p.age >= 19 && p.lastNet != null ? (p.lastNet >= 0 ? '월 저축 +' : '월 적자 -') + U.money(Math.abs(Math.round(p.lastNet / 12))) : '&nbsp;'}</small></div>
         <div class="as-chips">${holdings(p).map(h => `<span class="ah ${h.neg ? 'neg' : ''}">${h.label} <b>${h.neg ? '-' : ''}${U.money(h.v)}</b></span>`).join('') || '<span class="ah">아직 가진 것이 없다</span>'}</div>
         <span class="chev">›</span>
       </button>

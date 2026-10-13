@@ -6,15 +6,16 @@
 
   // 연간 사망 위험
   // 성별 차이: 한국 기대수명 남 약 80.6세 · 여 약 86.4세 (남성 사망률이 더 높다)
-  const SEX = { M: 1.3, F: 0.52 };
+  const SEX = { M: 1.0, F: 0.32 };
   // 질병(암·심장·뇌졸중 등)은 LG.Disease 가 따로 더하므로, 기본 곡선은 그만큼 낮춘다
   const BASE_K = 0.3;
   // k: 플레이어는 질병을 따로 계산하므로 BASE_K, 주변 인물(NPC)은 1
   function hazard(age, health, sex, k) {
     if (age < 1) return 0.0008;
-    const base = 0.00016 * Math.exp(0.088 * (age - 30)) * (sex ? SEX[sex] : 1) * (k || 1);
-    let hMul = Math.exp((58 - health) / 22);
-    if (health < 25) hMul *= 1 + (25 - health) * 0.15; // 위독하면 급격히 위험
+    const base = 0.00016 * Math.exp(0.088 * (age - 30) + (age > 75 ? 0.025 * (age - 75) : 0)) * (sex ? SEX[sex] : 1) * (k || 1);
+    // 건강이 낮을수록 위험이 커지고, 나이가 많을수록 그 차이가 더 크게 작용한다
+    let hMul = Math.exp((58 - health) / (age >= 70 ? 17 : 22));
+    if (health < 30) hMul *= 1 + (30 - health) * 0.18; // 위독하면 급격히 위험
     return U().clamp(base * hMul, 0.00005, 0.7);
   }
 
@@ -25,12 +26,14 @@
     if (a < 22) d = 0.3;
     else if (a < 35) d = -0.25;
     else if (a < 50) d = -0.45;
-    else if (a < 65) d = -0.55;
-    else if (a < 78) d = -0.85;
-    else d = -1.3;
-    // 회복력: 나이 기준치보다 크게 떨어져 있으면 조금씩 회복
-    const baseline = 88 - Math.max(0, a - 30) * 0.6;
-    if (p.stats.health < baseline - 18 && !S().has(p, 'cancer')) d += (baseline - 18 - p.stats.health) * 0.07;
+    else if (a < 65) d = -0.6;
+    // 노화는 갈수록 빨라진다: 60대 후반부터 해마다 더 크게 꺾인다 (관리하면 늦출 수 있다)
+    else if (a < 75) d = -1.1 - (a - 65) * 0.05;
+    else if (a < 85) d = -1.7 - (a - 75) * 0.08;
+    else d = -2.6 - (a - 85) * 0.1;
+    // 회복력: 나이 기준치보다 크게 떨어져 있으면 조금씩 회복 (나이가 들수록 기준치도, 회복력도 낮아진다)
+    const baseline = 88 - Math.max(0, a - 30) * 0.75;
+    if (p.stats.health < baseline - 18 && !S().has(p, 'cancer')) d += (baseline - 18 - p.stats.health) * (a >= 75 ? 0.04 : 0.07);
     d += p.effort.health * 0.022;
     if (S().has(p, 'smoker')) d -= 0.7;
     if (S().has(p, 'drinker')) d -= 0.35;

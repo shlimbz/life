@@ -16,10 +16,11 @@
     deposit:  { name: '세입자 보증금', icon: '🏢', rate: 0, term: 0, regular: true },   // 갭투자: 집을 팔 때 돌려준다
     credit:   { name: '신용대출·카드론', icon: '💳', rate: 0.09, term: 3 },
     private:  { name: '대부업·사채', icon: '⚠️', rate: 0.19, term: 2 },
+    hpension: { name: '주택연금(집 담보)', icon: '🏡', rate: 0.04, term: 0, regular: true },   // 갚지 않고 쌓이다가, 집으로 정산된다
     rehab:    { name: '채무조정 분할상환', icon: '⚖️', rate: 0.02, term: 8, regular: true }   // 신용회복위원회 채무조정·개인회생
   };
   // 여윳돈으로 먼저 갚는 순서 (금리 높은 것부터)
-  const ORDER = ['private', 'credit', 'install', 'biz', 'rehab', 'family', 'student', 'prop', 'jeonse', 'mortgage', 'deposit'];
+  const ORDER = ['private', 'credit', 'install', 'biz', 'rehab', 'family', 'student', 'prop', 'jeonse', 'mortgage', 'hpension', 'deposit'];
 
   const init = p => { if (!Array.isArray(p.loans)) p.loans = []; return p.loans; };
   const sum = p => init(p).reduce((a, l) => a + l.amt, 0);
@@ -76,12 +77,17 @@
     p.loans.forEach(l => {
       const K = KINDS[l.k];
       // 학자금은 취업 전까지 상환 유예, 세입자 보증금은 매매 때 한 번에 돌려준다
-      const grace = (l.k === 'student' && !p.job) || l.k === 'deposit';
+      // 학자금(취업 후 상환): 학생·군인이거나 연 소득이 상환 기준(약 2,500만 원) 아래면 원금 상환이 미뤄지고 연체도 없다
+      const studentGrace = l.k === 'student' && (!p.job || ['college', 'grad', 'military', 'student'].indexOf(p.status) >= 0 || (p.lastIncome || 0) < 2500 || (p.job && p.job.id === 'parttime'));
+      const grace = studentGrace || l.k === 'deposit' || l.k === 'hpension' || (l.pause || 0) > p.age;
+      if (l.k === 'hpension') { l.amt += Math.round(l.amt * l.rate); return; }   // 주택연금: 이자는 쌓이기만 한다
       const interest = Math.round(l.amt * (l.rate != null ? l.rate : K.rate));
       let principal = grace ? 0 : Math.round(l.amt / Math.max(1, l.left));
       // 채무조정 상환액은 벌이에 맞춰 정해진다 (소득의 약 20%)
       if (l.k === 'rehab') principal = Math.min(principal, Math.max(0, Math.round((p.lastIncome || 0) * 0.2) - interest));
-      const need = interest + principal;
+      // 상환 유예 중(학자금 유예·가족이 대신 내 주는 해)에는 이자만, 학자금 유예는 이자도 쌓아 둔다
+      const need = studentGrace ? 0 : interest + principal;
+      if (studentGrace) l.amt += Math.round(interest * 0.5);
       due += need;
       if (p.money < need && LG.Invest) LG.Invest.raise(p, need - p.money);
       const paid = Math.max(0, Math.min(p.money, need));
@@ -93,11 +99,20 @@
         // 못 낸 이자는 원금에 붙고, 신용대출·대부업은 연체 가산금리(연 3%p)가 더 붙는다. 연체가 쌓인다
         const covered = Math.max(0, paid - interest);
         l.amt = l.amt - covered + Math.max(0, interest - paid) + (K.regular ? 0 : Math.round(l.amt * 0.03));
-        if (l.k !== 'rehab') { l.late = (l.late || 0) + 1; lateKinds.push(l.k); }
+        if (l.k !== 'rehab') {
+          l.late = (l.late || 0) + 1; lateKinds.push(l.k);
+          // 정기 대출이 처음 밀리면 → 연체 채권으로 넘어가기 전에 도움을 구할 기회
+          if (KINDS[l.k].regular && l.late === 1 && ['install', 'biz', 'student', 'prop', 'mortgage', 'jeonse'].indexOf(l.k) >= 0 && (p.cool.m_loan_help || 0) <= p.age) p.queue.push({ id: 'm_loan_help', at: p.age });
+        }
       }
     });
     p.lastLoanPay = due;
 
+    // 주택연금은 집으로 정산한다: 집을 팔았거나 잃었으면 판 돈으로 갚고, 모자라는 부분은 청구되지 않는다(비소구)
+    if (amount(p, 'hpension') > 0 && !p.house) {
+      const x = amount(p, 'hpension'), cash = Math.min(Math.max(0, p.money), x);
+      p.money -= cash; pay(p, x, ['hpension']);
+    }
     // 미리 갚기: 생활비 여유분(비상금)을 남기고 남는 돈으로
     const reserve = LG.Invest ? LG.Invest.reserve(p) : 500;
     const spare = () => Math.max(0, p.money - reserve);
@@ -201,6 +216,15 @@
     return lines;
   }
 
+  // 올해 낼 원리금 추정 (생활비를 정할 때 먼저 떼어 둔다)
+  function dueEstimate(p) {
+    return init(p).reduce((a, l) => {
+      if (l.k === 'deposit' || l.k === 'hpension' || (l.pause || 0) > p.age) return a;
+      if (l.k === 'student' && (!p.job || (p.lastIncome || 0) < 2500)) return a;
+      return a + Math.round(l.amt * (l.rate != null ? l.rate : KINDS[l.k].rate) + l.amt / Math.max(1, l.left));
+    }, 0);
+  }
+
   // 생활비가 모자라 새로 빌릴 때: 신용이 괜찮으면 카드론, 이미 연체 중이거나 신용대출이 많으면 대부업으로 밀려난다
   function borrow(p, need) {
     const inc = Math.max(1200, p.lastIncome || 0);
@@ -215,5 +239,5 @@
     return ORDER.map(k => get(p, k)).filter(Boolean).map(l => ({ k: l.k, name: KINDS[l.k].name, icon: KINDS[l.k].icon, amt: l.amt, rate: l.rate, left: l.left, late: l.late || 0, regular: !!KINDS[l.k].regular }));
   }
 
-  LG.Loans = { KINDS, ORDER, init, sum, get, amount, add, pay, sync, yearly, borrow, list };
+  LG.Loans = { KINDS, ORDER, init, sum, get, amount, add, pay, sync, yearly, borrow, list, dueEstimate };
 })(window.LG = window.LG || {});

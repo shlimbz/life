@@ -9,7 +9,7 @@
     deposit: { name: '예적금', icon: '🏦' },
     stock:   { name: '주식·ETF', icon: '📈' },
     crypto:  { name: '코인', icon: '🪙' },
-    reit:    { name: '리츠(부동산 펀드)', icon: '🏢' }
+    reit:    { name: '리츠(부동산)', icon: '🏢' }
   };
   const KEYS = ['deposit', 'stock', 'crypto', 'reit'];
   const POLICY = {
@@ -18,7 +18,8 @@
     balanced: { name: '균형 투자', icon: '⚖️', desc: '예적금 35 · 주식 45 · 리츠 15 · 코인 5', w: { deposit: 0.35, stock: 0.45, crypto: 0.05, reit: 0.15 } },
     realty:   { name: '부동산 위주', icon: '🏢', desc: '예적금 30 · 리츠 50 · 주식 20. 월세처럼 배당이 나오고, 집값 흐름을 따라간다', w: { deposit: 0.3, stock: 0.2, crypto: 0, reit: 0.5 } },
     growth:   { name: '성장 투자', icon: '🌱', desc: '예적금 15 · 주식 70 · 코인 15', w: { deposit: 0.15, stock: 0.7, crypto: 0.15, reit: 0 } },
-    yolo:     { name: '공격 투자', icon: '🎲', desc: '주식 40 · 코인 60. 크게 벌거나 크게 잃는다', w: { deposit: 0, stock: 0.4, crypto: 0.6, reit: 0 } }
+    yolo:     { name: '공격 투자', icon: '🎲', desc: '주식 40 · 코인 60. 크게 벌거나 크게 잃는다', w: { deposit: 0, stock: 0.4, crypto: 0.6, reit: 0 } },
+    custom:   { name: '직접 정한 비율', icon: '🎛️', desc: '항목별 비율을 직접 정했다', w: { deposit: 0, stock: 0, crypto: 0, reit: 0 } }
   };
   const RE_NAME = { boom: '부동산 상승기', normal: '부동산 보합', slump: '부동산 침체' };
   // 지역마다 집값이 움직이는 폭(베타)과 기본 흐름이 다르다: 서울·수도권은 크게 오르내리고, 지방은 완만하거나 내림세
@@ -89,34 +90,60 @@
     return got;
   }
 
-  // 현금을 정책 비율로 나눠 넣는다
-  function deploy(p, amount) {
+  // 굴리는 비율(%) — 예비자금을 뺀 '굴릴 수 있는 돈' 중 몇 %를 어디에 둘지. 합이 100보다 작으면 나머지는 현금으로 남는다.
+  // p.invW 가 있으면 그것을, 없으면 고른 방식(POLICY)의 비율을 쓴다.
+  function weights(p) {
+    if (p.invW) return p.invW;
     const pol = POLICY[p.invPolicy];
-    if (!pol || amount <= 0) return 0;
-    const sum = KEYS.reduce((a, k) => a + (pol.w[k] || 0), 0);
-    if (sum <= 0) return 0;
-    KEYS.forEach(k => { p.inv[k] = (p.inv[k] || 0) + Math.round(amount * (pol.w[k] || 0) / sum); });
-    p.money -= amount;
-    return amount;
+    const w = {};
+    KEYS.forEach(k => { w[k] = pol ? Math.round((pol.w[k] || 0) * 100) : 0; });
+    return w;
+  }
+  const wSum = w => KEYS.reduce((a, k) => a + (w[k] || 0), 0);
+
+  // 남는 현금으로 목표 비율까지 채운다 (팔지는 않고 사기만 한다 → 해마다 비율이 유지된다)
+  function deploy(p, amount) {
+    const w = weights(p);
+    if (amount <= 0 || wSum(w) <= 0) return 0;
+    const base = amount + total(p);
+    let used = 0;
+    KEYS.forEach(k => {
+      const want = Math.round(base * (w[k] || 0) / 100) - (p.inv[k] || 0);
+      const x = Math.max(0, Math.min(want, amount - used));
+      if (x > 0) { p.inv[k] = (p.inv[k] || 0) + x; used += x; }
+    });
+    p.money -= used;
+    return used;
   }
 
-  // 모든 투자 자산을 정책 비율로 재배분 (정책 변경 시)
+  // 모든 투자 자산을 비율대로 다시 나눈다 (비율·방식을 바꿀 때)
   function rebalance(p) {
     init(p);
-    const pol = POLICY[p.invPolicy];
-    if (!pol) return;
+    const w = weights(p);
     const all = total(p);
     p.money += all; p.inv = { deposit: 0, stock: 0, crypto: 0, reit: 0 };
-    const keep = Math.max(reserve(p), 0);
-    if (KEYS.reduce((a, k) => a + (pol.w[k] || 0), 0) <= 0) return;
-    const amt = Math.max(0, p.money - keep);
-    deploy(p, amt);
+    if (wSum(w) <= 0) return;
+    const pool = Math.max(0, p.money - Math.max(reserve(p), 0));
+    KEYS.forEach(k => { const x = Math.round(pool * (w[k] || 0) / 100); p.inv[k] = x; p.money -= x; });
   }
 
   function setPolicy(p, key, doRebalance) {
     init(p);
-    if (!POLICY[key]) return;
+    if (!POLICY[key] || key === 'custom') return;
     p.invPolicy = key;
+    p.invW = null;
+    S().flag(p, 'asset_start');
+    if (doRebalance !== false) rebalance(p);
+  }
+  // 사용자가 직접 정한 비율 (합이 100을 넘으면 비율대로 줄인다)
+  function setWeights(p, w, doRebalance) {
+    init(p);
+    const out = {}; KEYS.forEach(k => { out[k] = Math.max(0, Math.min(100, Math.round(+w[k] || 0))); });
+    const s = wSum(out);
+    if (s > 100) KEYS.forEach(k => { out[k] = Math.floor(out[k] * 100 / s); });
+    const same = Object.keys(POLICY).find(key => key !== 'custom' && KEYS.every(k => Math.round((POLICY[key].w[k] || 0) * 100) === out[k]));
+    p.invPolicy = same || 'custom';
+    p.invW = same ? null : out;
     S().flag(p, 'asset_start');
     if (doRebalance !== false) rebalance(p);
   }
@@ -151,7 +178,7 @@
     if (S().has(p, 'private_pension') && p.job && p.age < 60 && p.money > 600) { p.money -= 300; p.inv.deposit += 300; }
 
     // 남는 현금은 정해 둔 방식대로 굴린다
-    if (p.invPolicy && p.invPolicy !== 'cash' && (p.age >= 19 || S().has(p, 'kid_investor'))) {
+    if (p.invPolicy && wSum(weights(p)) > 0 && (p.age >= 19 || S().has(p, 'kid_investor'))) {
       const extra = p.money - reserve(p);
       if (extra >= 200) deploy(p, extra);
     }
@@ -219,5 +246,5 @@
     return rows;
   }
 
-  LG.Invest = { CLASSES, KEYS, RE_NAME, reBeta, POLICY, REGIME_NAME, CRYPTO_NAME, init, total, yearly, raise, deploy, rebalance, setPolicy, allocation, reserve };
+  LG.Invest = { weights, setWeights, CLASSES, KEYS, RE_NAME, reBeta, POLICY, REGIME_NAME, CRYPTO_NAME, init, total, yearly, raise, deploy, rebalance, setPolicy, allocation, reserve };
 })(window.LG = window.LG || {});

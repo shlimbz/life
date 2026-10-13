@@ -159,6 +159,8 @@
         LG.Outcome.quitJob(p, 'retired');
         lines.push({ t: '더는 일을 이어가기 어려워 일을 내려놓았다.', icon: '🌅', major: true });
       }
+    } else if (a >= 65 && ['seeking', 'unemployed', 'idle'].indexOf(p.status) >= 0) {
+      p.status = 'retired';   // 65세가 넘으면 구직 중이 아니라 은퇴한 것으로 본다 (연금을 받는다)
     } else if (a >= 19) {
       const base = p.status === 'seeking' || p.status === 'unemployed' ? 52 : p.status === 'retired' ? 22 : p.status === 'college' ? 40 : 35;
       p.stress = U().clamp(p.stress + (base - p.stress) * 0.3, 0, 100);

@@ -7,7 +7,7 @@
 
   E.push({
     id: 'tr_travel', cat: 'travel', tier: 'choice', ages: [21, 82], w: 5, cd: 8, max: 3, icon: '🧳',
-    if: p => p.status !== 'military' && p.money >= 300,
+    if: p => p.status !== 'military' && H.cash(p) >= 300,
     label: '여행', title: '긴 여행',
     text: p => p.age < 40 ? '지금이 아니면 언제 가 볼까. 오래 꿈꾸던 곳으로 떠날까?' : p.age < 65 ? '일만 하다 보니 계절이 바뀌는 것도 몰랐다. 훌쩍 떠나 볼까?' : '다리 힘이 남아 있을 때 꼭 가 보고 싶은 곳이 있다.',
     choices: [
@@ -62,10 +62,10 @@
     text: '언젠가는 정리해야 할 것들. 남은 재산을 어떻게 할까?',
     choices: [
       { id: 'gift', label: '자녀에게 미리 물려준다', intent: 'family', if: p => H.kids(p).length > 0,
-        out: { t: '', log: '자녀에게 재산 증여', rel: { children: 12 }, flag: 'gave_estate', fn: p => { const a = Math.round(Math.max(0, p.money) * 0.5 / 100) * 100; p.money -= a; return `${LG.U.money(a)}원을 아이들에게 나눠 주었다.`; } } },
+        out: { t: '', log: '자녀에게 재산 증여', rel: { children: 12 }, flag: 'gave_estate', fn: p => { const a = Math.round(H.cash(p) * 0.5 / 100) * 100; if (a < 300) { LG.State.flag(p, 'will_written'); return p.house ? `현금으로 줄 만한 돈은 거의 없어, 살고 있는 집(${LG.U.money(p.house.value)}원)을 아이들에게 남긴다는 유언장을 썼다.` : '물려줄 만한 돈이 거의 없었다. 대신 그동안의 이야기를 편지로 남겼다.'; } p.money -= a; const tax = a > 5000 ? Math.round((a - 5000) * 0.1) : 0; return `예금과 투자금에서 ${LG.U.money(a)}원을 아이들에게 나눠 주었다${tax ? `(증여세 약 ${LG.U.money(tax)}원은 아이들이 냈다)` : ''}.`; } } },
       { id: 'donate', label: '일부를 기부한다', intent: 'social',
-        out: { t: '', log: '재산 일부 기부', achv: 8, hp: 10, flag: 'donor', fn: p => { const a = Math.round(Math.max(0, p.money) * 0.2 / 100) * 100; p.money -= a; return `${LG.U.money(a)}원을 장학재단에 기부했다. 내 이름이 붙은 장학금이 생겼다.`; } } },
-      { id: 'keep', label: '내 노후를 위해 쓴다', intent: 'rest', out: { t: '평생 아끼며 살았다. 이제는 나를 위해 쓴다.', hp: 6, exp: 6, fn: p => { p.money = Math.round(p.money * 0.9); return ''; } } }
+        out: { t: '', log: '재산 일부 기부', achv: 8, hp: 10, flag: 'donor', fn: p => { const a = Math.round(H.cash(p) * 0.2 / 100) * 100; p.money -= a; return `${LG.U.money(a)}원을 장학재단에 기부했다. 내 이름이 붙은 장학금이 생겼다.`; } } },
+      { id: 'keep', label: '내 노후를 위해 쓴다', intent: 'rest', out: { t: '평생 아끼며 살았다. 이제는 나를 위해 쓴다.', hp: 6, exp: 6, fn: p => { p.money -= Math.round(H.cash(p) * 0.1); return ''; } } }
     ]
   });
 

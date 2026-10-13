@@ -212,7 +212,7 @@
         partial: { t: '프리랜서로 일을 받으며 꿈을 이어 가는 중이다.', log: '프리랜서 시작', job: 'freelancer', flag: 'found_calling', hp: 4 },
         fail: { t: '꿈만으로 월세를 낼 수는 없었다. 아르바이트를 시작했다.', log: '꿈을 미루고 아르바이트', job: 'parttime', flag: 'dream_deferred', hp: -8 }
       } },
-    { id: 'shop', label: '작은 가게를 차린다', intent: 'risk', rank: p => 28 + LG.Aff.get(p, 'business') * 0.7, if: p => p.age >= 30 && p.money >= 2000,
+    { id: 'shop', label: '작은 가게를 차린다', intent: 'risk', rank: p => 28 + LG.Aff.get(p, 'business') * 0.7, if: p => p.age >= 30 && H.cash(p) >= 2000,
       check: { base: 38, partial: 0.5, f: [['talent', 'entrepreneur', 14], ['stat', 'social', 0.3], ['assets', 0.4], ['region', 'job', 0.15], ['fn', p => p.family.tags.indexOf('self_employed') >= 0 ? { label: '장사하는 집안', v: 8 } : null]] },
       out: {
         success: { t: '가게 문을 열었다. 첫 손님이 들어왔다.', log: '가게 창업', job: 'selfemp', money: -2000, flag: 'started_business', queue: [{ id: 'w_business_check', in: 3 }] },
@@ -722,13 +722,13 @@
 
   E.push({
     id: 'k_child_indep', cat: 'child', tier: 'choice', ages: [45, 80], w: 12, max: 1, icon: '🏡',
-    if: p => H.kids(p).some(c => c.age >= 26 && c.age <= 36) && p.money >= 1500,
+    if: p => H.kids(p).some(c => c.age >= 26 && c.age <= 36) && H.cash(p) >= 1500,
     child: p => H.kids(p).find(c => c.age >= 26 && c.age <= 36),
     label: '자녀', title: '자녀의 독립',
     text: '{child}이(가) 독립해 새 출발을 앞두고 있다. 집 구할 돈이 모자란다고 한다.',
     choices: [
       { id: 'give', label: '목돈을 보태준다', intent: 'family',
-        out: { t: '', log: '자녀에게 목돈 지원', rel: { children: 15 }, flag: 'supported_kids', fn: p => { const amt = Math.round(Math.min(p.money * 0.4, 15000) / 100) * 100; p.money -= amt; return `${LG.U.money(amt)}원을 보태 주었다. 아이가 고맙다며 울었다.`; } } },
+        out: { t: '', log: '자녀에게 목돈 지원', rel: { children: 15 }, flag: 'supported_kids', fn: p => { const amt = Math.round(Math.min(H.cash(p) * 0.4, 15000) / 100) * 100; p.money -= amt; return `${LG.U.money(amt)}원을 보태 주었다. 아이가 고맙다며 울었다.`; } } },
       { id: 'self', label: '스스로 하게 한다', intent: 'independence', out: { t: '"너도 이제 어른이다." 서운한 기색이 보였다.', rel: { children: -5 } } }
     ]
   });
@@ -754,7 +754,7 @@
 
   E.push({
     id: 'f_sibling_money', cat: 'family', tier: 'choice', ages: [28, 65], w: 5, max: 1, icon: '🤲',
-    if: p => !!H.rel(p, 'sibling') && p.money >= 1000,
+    if: p => !!H.rel(p, 'sibling') && H.cash(p) >= 1000,
     label: '가족', title: '형제의 부탁',
     text: '{sibling}이(가) 사업 자금이 급하다며 1천만 원만 빌려달라고 한다.',
     choices: [
@@ -875,7 +875,7 @@
           partial: { t: '창업은 했지만 매출이 지지부진하다.', log: '창업 (고전 중)', quit: true, job: 'ceo', jobOpt: { mul: 0.45 }, money: -1500, flag: 'started_business', sr: 10, queue: [{ id: 'w_business_check', in: 2 }] },
           fail: { t: '6개월 만에 접었다. 모아둔 돈이 사라졌다.', log: '창업 실패', quit: true, money: -2500, flag: 'business_failed', sr: 16, hp: -12 }
         } },
-      { id: 'invest', label: '돈만 투자한다', intent: 'money', if: p => p.money >= 1000,
+      { id: 'invest', label: '돈만 투자한다', intent: 'money', if: p => H.cash(p) >= 1000,
         check: { base: 33, partial: 0, f: [['talent', 'entrepreneur', 8]] },
         out: { success: { t: '투자한 회사가 성장했다. 지분 가치가 세 배가 됐다.', log: '친구 회사 투자 성공', money: 2000, hp: 8 }, fail: { t: '회사는 2년 만에 문을 닫았다. 투자금은 돌아오지 않았다.', money: -1000, hp: -5 } } },
       { id: 'no', label: '거절한다', intent: 'stability', out: { t: '지금 자리가 낫다고 생각했다.', minor: true } }
@@ -924,7 +924,7 @@
 
   E.push({
     id: 'w_own_shop', cat: 'career', tier: 'choice', ages: [33, 58], w: 5, max: 1, icon: '🏪',
-    if: p => !!p.job && ['selfemp', 'ceo'].indexOf(p.job.id) < 0 && p.money >= 2500,
+    if: p => !!p.job && ['selfemp', 'ceo'].indexOf(p.job.id) < 0 && H.cash(p) >= 2500,
     label: '인생 2막', title: '내 가게',
     text: '언젠가 내 가게를 하고 싶었다. 모은 돈으로 차려 볼까?',
     choices: [
@@ -1051,7 +1051,7 @@
 
   E.push({
     id: 'm_fraud', cat: 'crisis', tier: 'choice', ages: [38, 80], w: 4, max: 1, icon: '🎣',
-    if: p => p.money >= 2000,
+    if: p => H.cash(p) >= 2000,
     label: '솔깃한 제안', title: '원금 보장, 월 5%',
     text: '오랜 지인이 "원금 보장, 월 5% 수익"이라며 투자를 권한다. 벌써 돈을 번 사람이 많다고 한다.',
     choices: [
@@ -1059,7 +1059,7 @@
         check: { base: 8, partial: 0, max: 15, f: [] },
         out: {
           success: { t: '운 좋게 원금과 이자를 챙겨 빠져나왔다. 석 달 뒤 회사가 사라졌다.', money: 800 },
-          fail: { t: '', log: '투자 사기 피해', hp: -16, sr: 16, fn: p => { const a = Math.round(Math.min(p.money * 0.5, 20000)); p.money -= a; return `사기였다. 지인은 잠적했다. ${LG.U.money(a)}원을 잃었다.`; } }
+          fail: { t: '', log: '투자 사기 피해', hp: -16, sr: 16, fn: p => { const a = Math.round(Math.min(H.cash(p) * 0.5, 20000)); p.money -= a; return `사기였다. 지인은 잠적했다. ${LG.U.money(a)}원을 잃었다.`; } }
         } },
       { id: 'no', label: '정중히 거절한다', intent: 'stability', out: { t: '몇 달 뒤, 그 지인이 사기로 구속됐다는 뉴스를 봤다.', st: { mental: 2 } } }
     ]

@@ -98,11 +98,11 @@
       return lines;
     }
     if (!d.heart && R().chance(p, heartRate(a, g) * riskMul(p, 'heart'))) {
-      if (R().chance(p, 0.09)) { d.sudden = '갑작스러운 심근경색으로'; return lines; }
+      if (R().chance(p, 0.025)) { d.sudden = '갑작스러운 심근경색으로'; return lines; }   // 급사는 드물게만
       d.heart = { status: 'dx', since: a }; p.queue.push({ id: 'hl_heart', at: a }); return lines;
     }
     if (!d.stroke && R().chance(p, strokeRate(a, g) * riskMul(p, 'stroke'))) {
-      if (R().chance(p, 0.1)) { d.sudden = '갑작스러운 뇌졸중으로'; return lines; }
+      if (R().chance(p, 0.025)) { d.sudden = '갑작스러운 뇌졸중으로'; return lines; }
       d.stroke = { status: 'dx', since: a }; p.queue.push({ id: 'hl_stroke', at: a }); return lines;
     }
     if (R().chance(p, pneumoRate(a) * (p.stats.health < 40 ? 1.6 : 1) * (has(p, 'smoker') ? 1.3 : 1)) && (p.cool.pneumo || 0) <= a) {

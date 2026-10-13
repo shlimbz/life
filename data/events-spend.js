@@ -6,7 +6,7 @@
   const S = H.S;
   const M = v => LG.U.money(v);
   const ch = H.pusher({ tier: 'choice', cat: 'spend', label: '큰 지출', w: 12, max: 1 });
-  const cash = p => Math.max(0, p.money) + (p.inv ? p.inv.deposit : 0);
+  const cash = p => H.cash(p);
   const style = p => LG.Style && LG.Style.active(p) ? LG.Style.key(p) : 'balanced';
   const styleW = p => ({ luxury: 1.8, frugal: 0.5 })[style(p)] || 1;
   // 할부·대출: 원금 + 이자(대략)를 빚으로 잡는다
@@ -150,7 +150,7 @@
       { id: 'reset', label: '정신 차리고 다시 일한다', intent: 'career', out: { t: '다시 이력서를 썼다. 돈보다 하루의 리듬이 그리웠다는 걸 알았다.', hp: 2, fn: p => { if (!p.job) LG.Outcome.setJob(p, 'office_small'); return ''; } } },
       { id: 'more', label: '남은 돈으로 한 방을 노린다', intent: 'risk',
         check: { base: 18, partial: 0, f: [['stat', 'intelligence', 0.2]] },
-        out: { success: { t: '투자가 터졌다. 운이 두 번 왔다.', money: 20000, hp: 10 }, fail: { t: '남은 돈마저 날렸다. 로또 당첨자의 흔한 결말이 내 이야기가 됐다.', log: '당첨금을 모두 잃음', major: true, hp: -20, sr: 20, fn: p => { p.money = Math.round(p.money * 0.1); return ''; } } } }
+        out: { success: { t: '투자가 터졌다. 운이 두 번 왔다.', money: 20000, hp: 10 }, fail: { t: '남은 돈마저 날렸다. 로또 당첨자의 흔한 결말이 내 이야기가 됐다.', log: '당첨금을 모두 잃음', major: true, hp: -20, sr: 20, fn: p => { p.money = Math.round(p.money * 0.1); LG.Invest.KEYS.forEach(k => { p.inv[k] = Math.round((p.inv[k] || 0) * 0.1); }); return ''; } } } }
     ]
   });
 })(window.LG = window.LG || {});
