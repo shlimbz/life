@@ -11,6 +11,14 @@
     if (kind === 'major' || kind === 'choice' || kind === 'birth') p.headline = t;
   }
 
+  // 인생 지도: 해마다 한 번 그해의 마지막 모습(선택까지 끝난 뒤)을 남긴다 → 엔딩의 그래프
+  function mark(p) {
+    if (!Array.isArray(p.trace)) p.trace = [];
+    const t = { a: p.age, h: Math.round(p.happy), r: S().relScore(p), hl: Math.round(p.stats.health), w: Math.round(S().netWorth(p)) };
+    const last = p.trace[p.trace.length - 1];
+    if (last && last.a === t.a) p.trace[p.trace.length - 1] = t; else p.trace.push(t);
+  }
+
   // 결과 카드용 핵심 사건
   function highlights(p, n) {
     const items = p.history.filter(h => h.k === 'major' || (h.k === 'choice' && h.x));
@@ -27,7 +35,8 @@
   function scores(p) {
     const nw = S().netWorth(p);
     const money = nw <= 0 ? Math.max(5, 22 + nw / 2000) : 30 + Math.log10(1 + nw / 1000) * 21;
-    const hp = p.avg.happy * 0.7 + p.happy * 0.3, hl = p.avg.health * 0.6 + p.stats.health * 0.4, rl = p.avg.rel * 0.5 + S().relScore(p) * 0.5;
+    // 일찍 떠난 인생은 건강 점수가 높게 나오지 않게 (63세 암 사망인데 '건강 95'가 되던 문제)
+    const hp = p.avg.happy * 0.7 + p.happy * 0.3, hl = p.avg.health * 0.6 + p.stats.health * 0.4 - Math.max(0, 75 - p.age) * 1.0, rl = p.avg.rel * 0.5 + S().relScore(p) * 0.5;
     return {
       money: Math.round(U().clamp(money, 0, 100)),
       health: Math.round(spread(hl, 46, 1.5, 50)),
@@ -95,7 +104,9 @@
     const title = LG.DATA.endingTitles.find(x => x.if(s, p, c)).t;
     const tot = total(s);
     const best = LG.DATA.oneLiners.map(o => ({ t: o.t, sc: o.score(p, s) })).sort((a, b) => b.sc - a.sc)[0];
-    const topIntent = Object.keys(p.intents).sort((a, b) => p.intents[b] - p.intents[a])[0];
+    // 가치관 문장도 '평균보다 유난히 많이 고른 쪽'(lift)으로 고른다 — 단순 횟수로 고르면 원래 많은 '안정'이 76%를 차지했다
+    const lf = LG.DATA.lift;
+    const topIntent = Object.keys(p.intents).filter(k => p.intents[k] >= 2 && LG.DATA.valueText[k]).sort((a, b) => (lf ? lf(p, b) - lf(p, a) : p.intents[b] - p.intents[a]))[0];
     const values = topIntent ? '당신은 ' + LG.DATA.valueText[topIntent] : '당신은 흘러가는 대로 살았습니다.';
     const g = p.luckLog.good, b = p.luckLog.bad;
     let luck;
@@ -104,7 +115,8 @@
     else if (g + b >= 3) luck = '행운과 불운이 공평하게 찾아온 인생이었습니다.';
     else luck = '운보다는 선택이 만들어 간 인생이었습니다.';
     const kids = p.people.filter(n => n.role === 'child').length;
-    const spouse = p.people.find(n => n.role === 'spouse');
+    // 재혼했다면 지금 곁에 있는 배우자를 먼저 본다 (첫 배우자와 사별 후 재혼해도 '사별'로 나오던 문제)
+    const spouse = p.people.find(n => n.role === 'spouse' && n.alive) || p.people.find(n => n.role === 'spouse');
     const lastJob = mainJob(p);
     // 타고난 재능 — 언제, 어떻게 알게 되었는가 (끝내 모른 채 지나간 재능도 있다)
     const talents = p.talents.map(t => {
@@ -127,5 +139,5 @@
     };
   }
 
-  LG.Timeline = { add, highlights, scores, ending, mainJob, tendency, TEND, total, grade, crossroads };
+  LG.Timeline = { mark, add, highlights, scores, ending, mainJob, tendency, TEND, total, grade, crossroads };
 })(window.LG = window.LG || {});

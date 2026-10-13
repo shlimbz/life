@@ -27,7 +27,7 @@
           fail: { t: '', log: p => `${C(p).name} 치료가 듣지 않음`, major: true, st: { health: -28 }, hp: -14, sr: 16, fn: H.seq(setCancer('terminal'), pay(3200), p => '치료가 잘 듣지 않는다. 남은 시간을 어떻게 쓸지 생각하게 됐다.') }
         } },
       { id: 'gentle', label: '무리한 치료 대신 일상을 지킨다', intent: 'rest',
-        out: { t: '', log: '치료 대신 일상을 지키기로 함', hp: 6, exp: 4, rel: { family: 8 }, st: { health: -10 }, fn: H.seq(setCancer('untreated'), pay(300), p => C(p).surv >= 0.9 ? '진행이 느린 암이라 지켜보며 관리하기로 했다. 정기 검사만 빠짐없이 받는다.' : '병원보다 가족 곁을 택했다. 하루하루가 소중하다.') } },
+        out: { t: '', log: '치료 대신 일상을 지키기로 함', hp: 6, exp: 4, rel: { family: 8 }, st: { health: -10 }, fn: H.seq(setCancer('untreated'), pay(300), p => C(p).surv >= 0.9 && p.dz.cancer.early ? '진행이 느린 암이라 지켜보며 관리하기로 했다. 정기 검사만 빠짐없이 받는다.' : C(p).surv >= 0.9 ? '큰 수술 대신 약과 정기 검사로 버텨 보기로 했다. 진행이 느린 암이라지만 이미 퍼진 곳이 마음에 걸린다.' : '병원보다 가족 곁을 택했다. 하루하루가 소중하다.') } },
       { id: 'alt', label: '민간요법·대체요법에 기대 본다', intent: 'risk',
         check: { base: 10, partial: 0.3, f: [['fn', p => ({ label: '암의 종류', v: C(p).surv >= 0.9 ? 20 : 0 })]] },
         out: {

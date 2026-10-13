@@ -16,7 +16,7 @@
     { age: 62, if: p => S().has(p, 'saved_early'), t: '20~30대에 아껴 모은 돈이 노후의 여유가 되었다.' },
     { age: 64, if: p => S().has(p, 'kept_friends') && LG.Rel.all(p, 'friend').length >= 2, t: '꾸준히 연락해 온 친구들이 있어서, 나이 드는 게 덜 외롭다.' },
     { age: 40, if: p => S().has(p, 'retake_success'), t: '그때 한 해 더 버텼던 선택이 인생의 방향을 바꿨다.' },
-    { age: 62, if: p => S().has(p, 'mortgage_done'), t: '30년 가까이 갚아 온 집 대출이 끝난 집. 벽지 얼룩 하나까지 온전히 내 것이다.' },
+    { age: 62, if: p => S().has(p, 'mortgage_done') && !!p.house, t: p => { const y = p.flags.mortgage_done - (p.flags.home_owner != null ? p.flags.home_owner : p.flags.mortgage_done); return (y >= 25 ? '30년 가까이' : y >= 8 ? `${y}년 동안` : '몇 해 동안') + ' 갚아 온 대출이 끝난 집. 벽지 얼룩 하나까지 온전히 내 것이다.'; } },
     { age: 45, if: p => S().has(p, 'emigrated'), t: '낯선 나라에서 버틴 시간들이 이제는 나의 일부가 되었다.' }
   ];
 
@@ -200,7 +200,7 @@
 
     // 회고
     REFLECTIONS.forEach((r, i) => {
-      if (r.age === a && !p.done['refl' + i] && r.if(p)) { p.done['refl' + i] = 1; lines.push({ t: r.t, icon: '💭', reflect: true }); }
+      if (r.age === a && !p.done['refl' + i] && r.if(p)) { p.done['refl' + i] = 1; lines.push({ t: typeof r.t === 'function' ? r.t(p) : r.t, icon: '💭', reflect: true }); }
     });
 
     // 평생 평균

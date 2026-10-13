@@ -241,6 +241,7 @@
   function settingsBlock(inMenu) {
     const pr = LG.Storage.prefs();
     return SEG('speed', '진행 속도', '자동으로 흐르는 시간의 빠르기', [[1, '1×'], [2, '2×'], [3, '3×'], [4, '4×']], pr.speed || 1) +
+      SEG('scene', '캐릭터 무대', '나와 함께 나이 드는 캐릭터와 결과 연출', [['on', '보기'], ['off', '숨기기']], pr.scene === false ? 'off' : 'on') +
       SEG('fs', '글자 크기', '이야기와 선택지 글자', [['m', '보통'], ['l', '크게'], ['xl', '아주 크게']], pr.fs || 'm') +
       SEG('prob', '성공 확률 표시', '선택지 옆의 가능성 표시', [['on', '보기'], ['off', '숨기기']], pr.prob === false ? 'off' : 'on') +
       SEG('why', '영향 요인(확률 근거)', '무엇이 결과에 영향을 주는지', [['tap', '눌러서 보기'], ['open', '항상 펼침'], ['off', '숨기기']], pr.why || 'tap') +
@@ -251,10 +252,11 @@
     $$('#sheet-body .set-seg').forEach(seg => seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
       const k = seg.dataset.pref; let v = b.dataset.v;
       if (k === 'speed') { v = +v; st.speed = v; if (K.updateCtrl) K.updateCtrl(); }
-      if (k === 'prob') v = v === 'on';
+      if (k === 'prob' || k === 'scene') v = v === 'on';
       LG.Storage.setPref(k, v);
       seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
       K.applyPrefs();
+      if (k === 'scene' && K.scene) K.scene.update(true);
     })));
     const pc = $('#sheet-body #pref-confirm');
     if (pc) pc.onchange = () => { LG.Storage.setPref('confirm', pc.checked); toast(pc.checked ? '중요한 선택은 한 번 더 확인합니다' : '확인 없이 바로 선택합니다'); };

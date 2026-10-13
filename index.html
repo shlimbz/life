@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#16131f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -87,6 +87,8 @@
       </header>
 
       <div class="stage" id="stage">
+        <!-- 인생 무대: 나와 함께 나이 드는 캐릭터 (js/ui/scene.js) -->
+        <div id="scene" class="scene" aria-hidden="true"></div>
         <div id="feed" class="feed" aria-live="polite"></div>
         <!-- 이벤트 카드: 화면을 가리지 않고 가운데 영역에 도킹된다 -->
         <div id="event" class="event-dock hidden" role="dialog" aria-label="선택">
@@ -147,6 +149,7 @@
   <script src="data/events-alt.js"></script>
   <script src="data/events-dark.js"></script>
   <script src="data/events-style.js"></script>
+  <script src="data/events-life2.js"></script>
   <!-- 엔진 -->
   <script src="js/rng.js"></script>
   <script src="js/state.js"></script>
@@ -169,6 +172,8 @@
   <!-- 화면 -->
   <script src="js/ui/kit.js"></script>
   <script src="js/ui/core.js"></script>
+  <script src="js/ui/scene.js"></script>
+  <script src="js/ui/lifemap.js"></script>
   <script src="js/ui/play.js"></script>
   <script src="js/ui/event.js"></script>
   <script src="js/ui/sheets.js"></script>

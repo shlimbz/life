@@ -15,7 +15,7 @@
     { if: (s) => s.money >= 62 && s.happy >= 60 && s.rel >= 60 && s.health >= 52, t: '모든 것을 가진 듯한 삶' },
     { if: (s, p, c) => c.dom === 'luxury' && s.money < 36 && s.happy >= 55, t: '다 쓰고 떠났지만 후회는 없는 삶' },
     { if: (s, p, c) => c.dom === 'frugal' && s.money >= 78, t: '아끼고 모아 자유를 산 삶' },
-    { if: (s, p, c) => c.dom === 'health' && s.health >= 68, t: '몸을 아끼며 오래 걸어온 삶' },
+    { if: (s, p, c) => c.dom === 'health' && s.health >= 68 && p.age >= 75, t: '몸을 아끼며 오래 걸어온 삶' },
     { if: (s, p, c) => c.dom === 'family' && s.rel >= 66, t: '가족이 전부였던 삶' },
     { if: (s, p, c) => c.dom === 'growth' && s.achv >= 58, t: '끝없이 배우며 성장한 삶' },
     { if: (s, p, c) => c.tend && c.tend.k === 'bold' && (s.exp >= 66 || s.achv >= 66), t: '넘어져도 다시 도전한 삶' },
@@ -24,7 +24,8 @@
     { if: (s, p) => p.outcomes.fail >= 14 && p.outcomes.success >= 12 && s.happy >= 48, t: '파란만장, 그래도 이어 간 삶' },
     { if: (s) => s.happy >= 68, t: '마음이 넉넉했던 삶' },
     { if: (s) => s.rel >= 76, t: '사람이 곁에 있던 삶' },
-    { if: (s) => s.health >= 72, t: '건강하게 오래 걸어온 삶' },
+    { if: (s, p) => s.health >= 72 && p.age >= 75, t: '건강하게 오래 걸어온 삶' },
+    { if: (s, p) => p.age < 50, t: '너무 일찍 저문 삶' },
     { if: (s, p) => has(p, 'divorced') && s.rel < 50, t: '이별을 안고 홀로 걸어온 삶' },
     { if: (s) => s.rel < 34, t: '말년이 쓸쓸했던 삶' },
     { if: (s, p) => has(p, 'heavy_debt') || (s.money < 22 && s.happy < 50), t: '빚과 싸우며 버텨 낸 삶' },
@@ -37,7 +38,7 @@
   // 인생 한 줄 (조건에 맞는 후보 중 점수가 가장 높은 것)
   // 무작위로 고를 때 각 의도가 차지하는 평균 비율 (선택지 구성상 '안정'이 원래 많다).
   // 한 줄 평과 성향은 '얼마나 많이 골랐나'가 아니라 '평균보다 얼마나 더 골랐나(lift)'로 판단한다.
-  LG.DATA.intentBase = { stability: 0.197, rest: 0.118, career: 0.111, education: 0.087, health: 0.076, independence: 0.072, family: 0.069, risk: 0.061, adventure: 0.048, social: 0.047, money: 0.042, hobby: 0.036, love: 0.035 };   // node tools/intents.js 로 다시 잴 수 있다
+  LG.DATA.intentBase = { stability: 0.222, career: 0.096, rest: 0.103, education: 0.081, independence: 0.078, family: 0.075, health: 0.067, money: 0.067, risk: 0.058, social: 0.044, adventure: 0.041, hobby: 0.038, love: 0.032 };   // node tools/intents.js 로 다시 잴 수 있다
   const lift = (p, k) => {
     const tot = Object.keys(p.intents).reduce((a, x) => a + p.intents[x], 0);
     if (tot < 8) return 0;

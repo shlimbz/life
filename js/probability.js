@@ -41,7 +41,8 @@
     rel(p, role, w) {
       const n = LG.Rel.get(p, role);
       if (!n) return null;
-      return { label: (LG.Rel.ROLE_LABEL[role] || role) + '와의 관계', v: (n.rel - 55) * w };
+      const nm = LG.Rel.ROLE_LABEL[role] || role;
+      return { label: nm + U().josa(nm, '과', '와') + '의 관계', v: (n.rel - 55) * w };
     },
     perf(p, w) { return p.job ? { label: '업무 성과', v: (p.job.perf - 50) * w } : null; },
     jobYears(p, w, cap) { return p.job && p.job.years ? { label: '경력', v: Math.min(cap || 15, p.job.years * w) } : null; },
@@ -68,10 +69,13 @@
     }
     // 지금의 나(능력·건강·재산)가 같은 선택의 결과를 바꾼다 — 이벤트가 따로 정하지 않은 능력도 의도에 맞게 조금씩 반영
     const used = new Set((check.f || []).map(s => s[0] === 'stat' ? s[1] : s[0]));
-    (PROFILE[intent] || []).forEach(([k, w, label]) => {
+    (PROFILE[intent] || []).forEach(([k, w, label0]) => {
+      let label = label0;
       if (used.has(k)) return;
       let v;
-      if (k === 'assets') { const r = F.assets(p, 1); v = r.v * w * 4; }
+      // 미성년·갓 성인은 '내 통장'이 아니라 '집안 형편'이 뒷받침한다 (15세 체육 특기생 선발에 '여윳돈'이 걸림돌로 뜨던 문제)
+      if (k === 'assets' && (p.age < 20 || (p.age < 24 && ['college', 'military', 'retake', 'student'].indexOf(p.status) >= 0))) { const r = F.family(p, 1); v = r.v * w * 3; label = '집안 형편'; if (used.has('family')) return; }
+      else if (k === 'assets') { const r = F.assets(p, 1); v = r.v * w * 4; }
       else if (k === 'health') v = (p.stats.health - 55) * w;
       else if (k === 'happy') v = (p.happy - 55) * w;
       else v = (p.stats[k] - 50) * w;
@@ -80,7 +84,10 @@
     });
     // 같은 방식을 거듭 택하면 그 방식에 익숙해진다 (숙련)
     if (intent && (p.intents[intent] || 0) >= 4 && INTENT_LABEL[intent]) list.push({ label: INTENT_LABEL[intent] + '(익숙함)', v: Math.min(5, Math.round(p.intents[intent] * 0.35)) });
-    return list;
+    // 같은 이름의 요인(이벤트가 정한 성격 + 성격×의도 보정 등)은 하나로 합친다 → "내향적 성격, 내향적 성격" 중복 표시 방지
+    const merged = [];
+    list.forEach(x => { const m = merged.find(y => y.label === x.label); if (m) m.v += x.v; else merged.push({ label: x.label, v: x.v }); });
+    return merged.filter(x => x.v !== 0);
   }
 
   // 의도별로 함께 작용하는 '지금의 나' (k, 가중치, 표시 이름)

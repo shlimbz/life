@@ -72,13 +72,21 @@ hdup.length ? bad('중복 id: ' + [...new Set(hdup)].join(', ')) : ok(`id ${hid.
 
 console.log(`6. 시뮬레이션 ${N}판 (무작위 선택)`);
 const errs = {}; let deaths = 0;
+// 9번 검사용 집계 (플레이 리뷰에서 나온 문제의 재발 감시)
+const R9 = { buys: 0, earlyLate: 0, longCollect: 0, liners: {}, lives: 0 };
+const RAW_JOSA = /[가-힣]["'”’)]?(이\(가\)|을\(를\)|와\(과\)|은\(는\))|할부을|사채을|연인와/;
+const textAudit = (t, where) => { if (t && RAW_JOSA.test(t)) audit('조사 미교정(' + where + '): ' + t.slice(0, 40)); };
 const audits = {}; const audit = m => { audits[m] = (audits[m] || 0) + 1; };
 for (let i = 0; i < N; i++) {
   try {
     const p = LG.Game.newLife(null, 'chk' + i);
-    let g = 0;
+    let g = 0, boughtAt = null, run = 0, lastCol = -9;
     while (p.alive && g++ < 130) {
-      LG.Game.advance(p);
+      const hadHouse = !!p.house;
+      const yr = LG.Game.advance(p);
+      yr.lines.forEach(l => { textAudit(l.t, '로그'); if (l.card) textAudit(l.card.text, '알림 카드'); });
+      if (!hadHouse && p.house) { boughtAt = p.age; R9.buys++; }
+      if (LG.State.has(p, 'dating') && !LG.Rel.get(p, 'partner')) audit('연인이 없는데 연애 중 플래그가 남음');
       // 빚 장부: p.debt == 대출 합계, 음수 없음, 정기 대출이 3년 넘게 연체된 채 방치되지 않음, 갖고 있지 않은 부동산의 대출 없음
       if (Math.abs(LG.Loans.sum(p) - p.debt) > 1) audit('빚 합계와 대출 장부가 다름');
       if ((p.loans || []).some(l => l.amt < 0)) audit('음수 대출');
@@ -92,7 +100,14 @@ for (let i = 0; i < N; i++) {
         const before = { n: p.people.length, kids: LG.Rel.all(p, 'child').length, div: !!p.flags.parents_divorced, cf: !!p.flags.childfree };
         if (ev.id === 'c_parents_fight' && before.div) audit('부모님이 이미 이혼했는데 다툼 이벤트가 열림');
         if (ev.id === 'k_premarital' && p.gender === 'F' && /연인이 임신/.test(LG.Events.render(p, ev.title))) audit('여성 플레이어에게 "연인이 임신했다"');
+        if (ev.id === 'm_collect') { run = lastCol === p.age - 1 ? run + 1 : 1; lastCol = p.age; if (run === 4) R9.longCollect++; }
+        if (ev.id === 'm_loan_help' && boughtAt != null && p.age - boughtAt <= 1 && LG.Loans.get(p, 'mortgage') && LG.Loans.get(p, 'mortgage').late) R9.earlyLate++;
+        textAudit(LG.Events.render(p, ev.text), ev.id);
+        LG.Events.preview(p, ev).forEach(o => { if (o.prob) { const ls = o.prob.factors.map(f => f.label); if (ls.some((x, j) => ls.indexOf(x) !== j)) audit('확률 요인 이름 중복: ' + ev.id); } });
+        const hh = !!p.house;
         const r = LG.Game.choose(p, v[Math.floor(Math.random() * v.length)].id);
+        if (!hh && p.house) { boughtAt = p.age; R9.buys++; }
+        textAudit(r.text, ev.id + ' 결과');
         if ((ev.id === 'r_reunion' || ev.id === 'ec_classmates') && LG.Rel.get(p, 'partner') && p.people.length > before.n) audit(ev.id + ': 재회인데 새 인물이 생김');
         if (!before.cf && p.flags.childfree && before.kids > 0) audit('자녀가 있는데 childfree 로 기록');
         if (/그 사람|배우자와 결혼/.test(r.text + (p.history[p.history.length - 1] || {}).t) && /r_propos/.test(ev.id)) audit(ev.id + ': 결과 문장에서 상대 이름이 사라짐');
@@ -103,7 +118,10 @@ for (let i = 0; i < N; i++) {
     if (!p.alive) deaths++;
     const badText = p.history.find(h => /\{\w+\}|undefined|NaN|\[object/.test(h.t));
     if (badText) throw new Error('연표 문장에 치환되지 않은 값: ' + badText.t.slice(0, 60));
-    LG.Timeline.ending(p);
+    const end = LG.Timeline.ending(p);
+    R9.lives++; R9.liners[end.oneLiner] = (R9.liners[end.oneLiner] || 0) + 1;
+    if (/오래 걸어온/.test(end.title) && p.age < 75) audit('일찍 떠났는데 "오래 걸어온 삶" 칭호: ' + p.age + '세');
+    LG.Dex.record(LG.Dex.empty(), p, end).fresh.forEach(f => { if (/[a-z_]{3,}/.test(f)) audit('도감 "새로 추가"에 내부 키 노출: ' + f); });
     const s = JSON.stringify(p); if (/NaN|undefined/.test(s.replace(/"[^"]*undefined[^"]*"/g, ''))) throw new Error('상태에 NaN/undefined');
     LG.State.migrate(JSON.parse(s));
   } catch (e) { const k = (e.stack || String(e)).split('\n').slice(0, 2).join(' | '); errs[k] = (errs[k] || 0) + 1; }
@@ -114,6 +132,13 @@ ek.length ? ek.forEach(k => bad(`${errs[k]}회: ${k}`)) : ok(`${N}판 모두 오
 console.log('8. 인물·가족 정합성 (시뮬레이션 중 감시)');
 const ak = Object.keys(audits);
 ak.length ? ak.forEach(k => bad(`${audits[k]}회: ${k}`)) : ok('재회=같은 인물 · 청혼 후 이름 유지 · 성별에 맞는 임신 대사 · 이혼 후 다툼 이벤트 없음 · childfree 오기록 없음 · 빚 장부 일치');
+
+console.log('9. 플레이 리뷰 재발 감시 (빚 독촉 · 주담대 · 한 줄 평 · 조사 · 도감)');
+R9.longCollect ? bad(`빚 독촉이 4년 넘게 해마다 선택으로 뜬 판 ${R9.longCollect}개`) : ok('빚 독촉이 해마다 선택을 차지하는 판 없음');
+const lateRate = R9.buys ? R9.earlyLate / R9.buys : 0;
+lateRate > 0.02 ? bad(`집을 산 지 1년 안에 주담대 연체 ${(lateRate * 100).toFixed(1)}% (기준 2%)`) : ok(`집 구매 ${R9.buys}건 중 1년 안 주담대 연체 ${(lateRate * 100).toFixed(1)}%`);
+const topLiner = Object.entries(R9.liners).sort((a, b) => b[1] - a[1])[0];
+if (topLiner) (topLiner[1] / R9.lives > 0.2 ? bad : ok)(`가장 흔한 한 줄 평 ${(topLiner[1] / R9.lives * 100).toFixed(0)}% "${topLiner[0]}" (기준 20%)`);
 
 console.log('7. 옛 저장 데이터 불러오기 (v1 → 현재)');
 try {

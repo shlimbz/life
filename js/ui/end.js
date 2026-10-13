@@ -56,6 +56,7 @@
           ${bar('🏆', '성취', s.achv)}${bar('🧭', '경험', s.exp)}
         </div>
         <div class="r-facts">${facts.map(f => `<span>${esc(f)}</span>`).join('')}</div>
+        ${K.lifemap ? K.lifemap.html(p, e) : ''}
         ${(e.talents && e.talents.length) ? `<p class="r-sec">타고난 재능</p><ul class="r-tal">${e.talents.map(t => `<li class="${t.found ? '' : 'lost'}"><b>${t.icon} ${esc(t.name)}${t.grade === 'genius' ? ' ★' : t.grade === 'gifted' ? ' ☆' : ''}</b><span>${esc(t.line)}</span></li>`).join('')}</ul>` : `<p class="r-sec">타고난 재능</p><ul class="r-tal"><li class="lost"><span>특별히 타고난 재능은 없었다. 그래서 더 평범하게, 더 스스로의 힘으로.</span></li></ul>`}
         <p class="r-sec">인생의 갈림길</p>
         <ul class="r-cross">${cr.map(x => `<li><b>${x.a}세 · ${esc(x.ic)} ${esc(x.ti)}</b><span>“${esc(x.ch)}”${RES[x.ty] ? ` <em class="${x.ty}">${RES[x.ty]}</em>` : ''}</span></li>`).join('') || '<li><span>조용한 인생이었다.</span></li>'}</ul>
@@ -63,7 +64,7 @@
         <p class="r-seed">인생 코드 ${esc(p.seed)} · 선택 ${e.choices}번 · 대한민국 인생게임</p>
       </div>
       ${e.fresh && e.fresh.length ? `<p class="end-fresh">📖 도감에 새로 추가 · ${e.fresh.map(esc).join(' · ')}</p>` : ''}
-      ${p.daily ? (() => { const b = LG.Storage.dex().daily[p.daily]; return `<p class="end-fresh">📅 오늘의 인생 최고 기록 · ${b ? b.total + '점 (' + esc(b.title) + ')' : '-'}<br><small>같은 날 같은 출발점 — 결과 카드를 친구에게 보내 겨뤄 보세요</small></p>`; })() : ''}
+      ${p.daily ? (() => { const b = LG.Storage.dex().daily[p.daily]; return `<p class="end-fresh">📅 오늘의 인생 공식 기록(첫 도전) · ${b ? b.total + '점 (' + esc(b.title) + ')' : '-'}${b && b.tries > 1 ? `<br><small>이번은 ${b.tries}번째 도전 — 연습 기록 최고 ${b.best}점</small>` : ''}<br><small>같은 날 같은 출발점 — 결과 카드를 친구에게 보내 겨뤄 보세요</small></p>`; })() : ''}
       <p class="end-text">${esc(e.values)}<br>${esc(e.luck)}<br><span style="color:var(--ink-3)">어느 쪽이 더 좋은 인생인지는, 당신이 정합니다.</span></p>
       <div class="end-actions">
         <button class="btn btn-primary" id="btn-reborn" type="button">다시 태어나기</button>
@@ -74,6 +75,7 @@
       </div>
       <div class="end-tl"><h3 class="sh-sec">인생 연표</h3>${tl.map(x => `<div class="log-item k-${x.k}"><b>${x.a}세</b><span>${esc(x.t)}</span></div>`).join('')}</div>`;
     $('#end-body').scrollTop = 0;
+    if (K.lifemap) K.lifemap.bind($('#end-body'), p);
     $('#btn-reborn').onclick = () => { p = K.p = null; initTitle(); };
     $('#btn-same').onclick = () => { startLife(null, p.seed); };
     $('#btn-save-card').onclick = () => saveCard(e);
@@ -82,7 +84,7 @@
   // 결과 카드를 이미지로 (공유 시트 또는 다운로드)
   function saveCard(e) {
     let p = K.p;
-    const W = 1080, H = 1440, c = document.createElement('canvas');
+    const W = 1080, H = 1720, c = document.createElement('canvas');
     c.width = W; c.height = H;
     const x = c.getContext('2d');
     const F = getComputedStyle(document.body).fontFamily;
@@ -120,17 +122,20 @@
       x.fillStyle = ink; x.fillRect(bx, by + 20, 400 * r[1] / 100, 10);
     });
     const RES = { success: '성공', partial: '절반의 성공', fail: '실패', done: '' };
-    text('인생의 갈림길', L, 945, 28, 700, ink2);
+    // 인생 지도 (행복·관계·건강 곡선 + 큰 순간 아이콘)
+    text('인생 지도', L, 900, 28, 700, ink2);
+    if (!(K.lifemap && K.lifemap.canvas(x, p, L, 930, W - L * 2, 170, F))) text('기록이 충분하지 않다', L, 990, 26, 500, ink2);
+    text('인생의 갈림길', L, 1230, 28, 700, ink2);
     const cr = e.cross || [];
-    x.fillStyle = '#d9cbb9'; x.fillRect(L, 972, 4, cr.length * 104 - 20);
+    x.fillStyle = '#d9cbb9'; x.fillRect(L, 1257, 4, cr.length * 104 - 20);
     cr.forEach((h, i) => {
-      const y = 1010 + i * 104;
+      const y = 1295 + i * 104;
       x.fillStyle = ink; x.beginPath(); x.arc(L + 2, y - 10, 8, 0, Math.PI * 2); x.fill();
       text(fit(`${h.a}세 · ${h.ti}`, 820, 33, 800), L + 30, y, 33, 800, ink);
       text(fit(`“${h.ch}”${RES[h.ty] ? '  ' + RES[h.ty] : ''}`, 820, 28, 500), L + 30, y + 44, 28, 500, '#4a4050');
     });
-    text(`"${e.oneLiner}"`, L, 1345, 42, 800, ink);
-    text(p.daily ? `대한민국 인생게임 · 오늘의 인생 ${p.daily} · 종합 ${e.total}점` : '대한민국 인생게임 · 인생 코드 ' + p.seed, L, 1400, 26, 500, ink2);
+    text(`"${e.oneLiner}"`, L, 1640, 42, 800, ink);
+    text(p.daily ? `대한민국 인생게임 · 오늘의 인생 ${p.daily} · 종합 ${e.total}점${(() => { const b = LG.Storage.dex().daily[p.daily]; return b && b.tries > 1 ? ` (${b.tries}번째 도전)` : ''; })()}` : '대한민국 인생게임 · 인생 코드 ' + p.seed, L, 1692, 26, 500, ink2);
     c.toBlob(async blob => {
       if (!blob) return;
       const file = new File([blob], `인생_${p.name}_${p.age}세.png`, { type: 'image/png' });

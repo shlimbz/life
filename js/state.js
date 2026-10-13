@@ -18,8 +18,10 @@
     // "민지이(가)" → "민지가" 처럼 조사 자동 교정
     fixJosa(str) {
       if (!str) return str;
-      return str.replace(/([가-힣])(이\(가\)|와\(과\)|을\(를\)|은\(는\)|\(으\)로|아\(야\)|이\(라\))/g, (m, ch, j) => {
-        const code = ch.charCodeAt(0) - 0xAC00, jong = code % 28, has = jong !== 0;
+      // 낱말과 조사 사이에 닫는 따옴표·괄호가 있어도("두부"이(가)) 앞 글자의 받침을 본다
+      return str.replace(/([가-힣])(["'”’)\]]?)(이\(가\)|와\(과\)|을\(를\)|은\(는\)|\(으\)로|아\(야\)|이\(라\))/g, (m, ch0, q, j) => {
+        const code = ch0.charCodeAt(0) - 0xAC00, jong = code % 28, has = jong !== 0;
+        const ch = ch0 + q;
         switch (j) {
           case '이(가)': return ch + (has ? '이' : '가');
           case '와(과)': return ch + (has ? '과' : '와');
@@ -69,7 +71,7 @@
 
     create(gender, seed) {
       return {
-        v: 7, seed, rngState: LG.RNG.hashSeed(seed), daily: null, seekTries: 0, dz: {}, car: null, bldg: null, ctx: null, firstLoveId: null,
+        v: State.SAVE_VERSION, seed, rngState: LG.RNG.hashSeed(seed), daily: null, seekTries: 0, dz: {}, car: null, bldg: null, ctx: null, firstLoveId: null,
         gender, name: '', surname: '', given: '',
         birthYear: 2000, age: 0, year: 2000, alive: true, cause: null,
         region: 'seoul', urban: true, town: '',
@@ -89,7 +91,7 @@
         avg: { n: 0, health: 0, happy: 0, rel: 0 },
         history: [], headline: '', pending: null,
         inv: { deposit: 0, stock: 0, crypto: 0 }, invPolicy: null, mkt: null, invLast: null, catLast: {},
-        style: null, styleSince: 0, styleChosen: false, styleYears: {}, styleLog: [], cross: []
+        style: null, styleSince: 0, styleChosen: false, styleYears: {}, styleLog: [], cross: [], trace: []
       };
     },
 
@@ -138,6 +140,7 @@
       6: p => { if (p.bldg === undefined) p.bldg = null; if (p.ctx === undefined) p.ctx = null; if (p.firstLoveId === undefined) p.firstLoveId = null; },
       // v7 → v8: 대출을 종류별로(p.loans) · 투자용 부동산(p.prop) · 리츠(p.inv.reit) · 부동산 시장
       7: p => {
+        if (!Array.isArray(p.trace)) p.trace = [];   // 인생 지도(해마다 행복·관계·건강·순자산) — 예전 저장본은 이어 할 때부터 기록
         if (p.prop === undefined) p.prop = null;
         if (p.inv && p.inv.reit === undefined) p.inv.reit = 0;
         if (!Array.isArray(p.loans)) {

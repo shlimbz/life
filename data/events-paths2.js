@@ -270,11 +270,18 @@
   ch({
     id: 'wr_memoir', cat: 'writing', ages: [55, 82], dom: ['writing'], icon: '📝', label: '글',
     if: p => p.age >= 55,
-    title: '내 이야기 쓰기', text: p => '손주(혹은 가까운 사람)가 "할머니·할아버지의 어릴 적 이야기를 듣고 싶어요"라고 했다. 살아온 ' + (p.age - 20) + '여 년을 글로 남겨 볼까.',
+    title: '내 이야기 쓰기', text: p => {
+      // 누가 이야기를 청하는지는 실제 가족 상황에 맞춘다 (손주가 없는데 손주가 묻던 문제)
+      const gp = p.gender === 'M' ? '할아버지' : '할머니';
+      const who = has(p, 'grandparent') ? `손주가 "${gp} 어릴 적 이야기를 듣고 싶어요"라고 했다.`
+        : LG.Rel.all(p, 'child').length ? '다 큰 아이가 "엄마·아빠 젊었을 때 얘기 좀 해 줘"라며 웃었다.'.replace('엄마·아빠', p.gender === 'M' ? '아빠' : '엄마')
+        : '동네 도서관에서 "나의 인생 이야기" 글쓰기 모임을 연다는 안내문을 봤다.';
+      return `${who} 살아온 ${Math.floor(p.age / 10) * 10}여 년을 글로 남겨 볼까.`;
+    },
     choices: [
       { id: 'write', label: '자서전·회고록을 쓴다', intent: 'hobby',
         out: { t: '기억을 하나씩 꺼내 적다 보니 잊고 있던 얼굴과 웃음이 되살아났다. 쓰면서 많이 울고 웃었다.', log: '살아온 이야기를 글로 남김', flag: 'memoir', hp: 12, sr: -6, rel: { family: 4 }, st: { mental: 2 } } },
-      { id: 'tell', label: '말로 들려주고 녹음해 둔다', intent: 'family', out: { t: '저녁마다 이야기를 들려주었다. 아이들의 눈이 반짝였다.', hp: 8, rel: { family: 5 } } },
+      { id: 'tell', label: '말로 들려주고 녹음해 둔다', intent: 'family', if: p => LG.Rel.all(p, 'child').length > 0, out: { t: '저녁마다 이야기를 들려주었다. 듣는 얼굴들이 반짝였다.', hp: 8, rel: { family: 5 } } },
       { id: 'no', label: '"내 이야기가 뭐 대단하다고" 웃어넘긴다', intent: 'rest', out: { t: '손사래를 쳤지만 마음은 따뜻해졌다.', hp: 1 } }
     ]
   });

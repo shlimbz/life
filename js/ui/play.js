@@ -167,6 +167,7 @@
     $('#life-dot').style.left = pct + '%';
     setStage(p.age);
 
+    if (K.scene) K.scene.update(instant);
     const dash = $('#dash');
     dash.innerHTML = dashHTML();
     const now = snapshotHUD();

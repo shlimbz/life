@@ -42,7 +42,7 @@
   });
 
   E.push({
-    id: 'c_newkid', cat: 'friend', tier: 'choice', ages: [6, 11], w: 10, icon: '🧒',
+    id: 'c_newkid', cat: 'friend', tier: 'choice', ages: [7, 11], w: 10, icon: '🧒',
     label: '친구', title: '전학 온 아이',
     text: '반에 전학 온 아이가 쉬는 시간마다 혼자 창밖만 보고 있다.',
     choices: [
@@ -154,7 +154,7 @@
   // ───────────────────────── 청소년기 ─────────────────────────
 
   E.push({
-    id: 't_middle', cat: 'education', tier: 'major', ages: [13, 13], milestone: true, icon: '🏫',
+    id: 't_middle', light: true, cat: 'education', tier: 'major', ages: [13, 13], milestone: true, icon: '🏫',
     label: '청소년기', title: '중학생이 되었다',
     text: '새 교복, 새 친구들. 중학교 3년을 어디에 쏟을까?',
     choices: [
@@ -316,7 +316,8 @@
     id: 't_family_crisis', cat: 'crisis', tier: 'major', ages: [12, 18], icon: '📉', max: 1,
     w: p => p.family.tags.indexOf('job_risk') >= 0 ? 20 : p.family.tier <= 3 ? 3 : 1,
     if: p => LG.Rel.parents(p).some(n => n.job && n.job !== 'homemaker' && n.role !== 'grandparent'),
-    label: '가족의 위기', title: '{parent}의 실직',
+    // 실제로 일하던 부모(전업주부가 아닌 쪽)를 제목에 쓴다
+    label: '가족의 위기', title: p => { const n = LG.Rel.parents(p).find(x => x.job && x.job !== 'homemaker' && x.role !== 'grandparent'); return (n && n.role === 'father' ? '아버지' : n && n.role === 'mother' ? '어머니' : '부모님') + '의 실직'; },
     text: '다니던 회사가 어려워져 갑자기 일을 그만두게 되셨다. 집안 공기가 무겁다. 당신의 선택과 관계없이 찾아온 일이다.',
     choices: [
       { id: 'help', label: '아르바이트로 집을 돕는다', intent: 'family',

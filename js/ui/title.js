@@ -22,7 +22,7 @@
     $('#past-lives').textContent = lives.length ? `지금까지 ${lives.length}번의 인생을 살았다` : '';
     // 오늘의 인생 · 도감 요약
     const dex = LG.Storage.dex(), today = LG.Dex.today(), best = dex.daily[today];
-    $('#daily-sub').textContent = best ? `오늘 최고 ${best.total}점` : today.slice(5).replace('-', '월 ') + '일';
+    $('#daily-sub').textContent = best ? `오늘 기록 ${best.total}점` : today.slice(5).replace('-', '월 ') + '일';
     const cat = LG.Dex.catalog();
     $('#dex-sub').textContent = `칭호 ${Object.keys(dex.titles).length}/${cat.titles.length}`;
     if (LG.Storage.lastError) { setTimeout(() => K.toast(LG.Storage.lastError), 400); LG.Storage.lastError = null; }
@@ -44,7 +44,12 @@
 
   function startLife(gender, seed, daily) {
     let p = K.p;
-    seed = seed || new URLSearchParams(location.search).get('seed') || undefined;
+    // 주소의 ?seed= 는 '처음 한 판'에만 쓴다 — 공유 링크로 들어온 사람이 다시 태어날 때마다 같은 인생이 나오지 않게
+    if (!seed) {
+      const urlSeed = new URLSearchParams(location.search).get('seed');
+      if (urlSeed) { seed = urlSeed; try { history.replaceState(history.state, '', location.pathname + location.hash); } catch (e) { /* 무시 */ } }
+    }
+    seed = seed || undefined;
     p = K.p = LG.Game.newLife(gender, seed, daily);
     LG.Storage.save(p);
     birthReveal();

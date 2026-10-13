@@ -103,12 +103,15 @@
     // 1. 예약된 이벤트 (과거 선택의 결과)
     const due = p.queue.filter(q => q.at <= p.age);
     p.queue = p.queue.filter(q => q.at > p.age);
+    // 'soft' 예약 이벤트(빚 독촉처럼 해마다 다시 올 수 있는 것)는 그해의 정해진 갈림길(구직·입시·결혼 등)에 자리를 양보한다
+    const msNow = () => all().some(e => isMs(p, e) && eligible(p, e));
     due.forEach(q => {
       const ev = get(q.id);
       if (!ev || !eligible(p, ev, true)) return;
       if (ev.tier === 'auto') { const l = runAuto(p, ev); if (l) lines.push(l); }
+      else if (!choiceEv && ev.soft && (q.deferred || 0) < 2 && msNow()) p.queue.push({ id: q.id, at: p.age + 1, deferred: (q.deferred || 0) + 1 });
       else if (!choiceEv) choiceEv = ev;
-      else p.queue.push({ id: q.id, at: p.age + 1 });
+      else if (!ev.soft) p.queue.push({ id: q.id, at: p.age + 1 });
     });
 
     if (!choiceEv) choiceEv = nextChained(p);
@@ -192,8 +195,8 @@
     // 이름 뒤에 바로 붙은 조사(와/과 · 을/를 · 은/는)는 받침에 맞게 고친다 → "주원와" 대신 "주원과"
     const MARK = '\u0001', END = '\u0002';
     const filled = t.replace(/\{(\w+)\}/g, (m, k) => { const v = fill(k); return v === m ? m : MARK + v + END; });
-    const PAIR = { 와: ['과', '와'], 과: ['과', '와'], 을: ['을', '를'], 를: ['을', '를'], 은: ['은', '는'], 는: ['은', '는'] };
-    const fixed = filled.replace(/\u0001([^\u0002]*)\u0002(와|과|을|를|은|는)?(?=[\s,.!?"'’”)…]|$)/g, (m, v, j) => {
+    const PAIR = { 와: ['과', '와'], 과: ['과', '와'], 을: ['을', '를'], 를: ['을', '를'], 은: ['은', '는'], 는: ['은', '는'], 이: ['이', '가'], 가: ['이', '가'] };
+    const fixed = filled.replace(/\u0001([^\u0002]*)\u0002(와|과|을|를|은|는|이|가)?(?=[\s,.!?"'’”)…]|$)/g, (m, v, j) => {
       if (!j) return v;
       const ch = v.charCodeAt(v.length - 1) - 0xAC00;
       const has = ch >= 0 && ch <= 11171 && ch % 28 !== 0;
@@ -353,5 +356,16 @@
   }
   function flavor(p) { return flavorLines(p, 0, false)[0] || null; }
 
-  LG.Events = { init, get, all, eligible, pickYear, nextChained, bindCtx, preview, resolve, runAuto, render, flavor, flavorLines, visibleChoices, choiceRate, weight };
+  // '두 번 눌러 확정'은 되돌리기 어려운 선택에만 — 예전엔 전체 선택의 75%(독촉 전화 포함)에 걸려 의미가 흐려졌다
+  const HEAVY_CATS = ['education', 'career', 'marriage', 'child', 'retirement', 'housing', 'travel', 'global', 'health', 'opportunity', 'altpath', 'money'];
+  const SAFE_IDS = ['wait', 'no', 'later', 'keep', 'stay', 'watch', 'skip', 'rest', 'hold'];
+  function isHeavy(ev, c) {
+    if (c.confirm) return true;
+    if (ev.soft || ev.light || SAFE_IDS.indexOf(c.id) >= 0) return false;
+    if (ev.ages && ev.ages[1] < 15) return false;   // 어린 시절 선택은 가볍게
+    if (c.intent === 'risk') return true;
+    return (ev.tier === 'major' || !!ev.milestone) && HEAVY_CATS.indexOf(ev.cat) >= 0;
+  }
+
+  LG.Events = { isHeavy, init, get, all, eligible, pickYear, nextChained, bindCtx, preview, resolve, runAuto, render, flavor, flavorLines, visibleChoices, choiceRate, weight };
 })(window.LG = window.LG || {});

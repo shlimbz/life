@@ -12,10 +12,12 @@
     const gr = J.growth * 0.8;
     const g = Math.pow(1 + gr, Math.min(yrs, 15)) * Math.pow(1 + gr / 3, Math.max(0, yrs - 15));
     const abroad = p.liveIn === 'abroad' ? 1.3 : 1; // 해외 임금 수준
+    // 지역 임금 차이: 일자리가 몰린 곳은 같은 일을 해도 조금 더 번다 (수도권 생활비만 비싸고 월급은 같던 문제)
+    const regPay = p.liveIn === 'abroad' ? 1 : 1 + U().clamp((S().regionAttr(p, 'job') - 60) * 0.004, -0.08, 0.14);
     // 학력 프리미엄: 경력이 쌓일수록 학위의 차이가 벌어진다 (한국 임금 구조)
     const eduP = { grad: 1.14, college: 1.06 }[p.edu] || 0.94;
     const eduMul = 1 + (eduP - 1) * Math.min(1, yrs / 12);
-    return Math.round(J.income * g * (0.8 + p.job.perf / 250) * (p.job.mul || 1) * abroad * eduMul * (LG.Style ? LG.Style.income(p) : 1));
+    return Math.round(J.income * g * (0.8 + p.job.perf / 250) * (p.job.mul || 1) * abroad * regPay * eduMul * (LG.Style ? LG.Style.income(p) : 1));
   }
 
   // 직업별 연봉 배수 상한 (고정급 직업은 승진·이직을 거듭해도 한계가 있다)
@@ -37,7 +39,8 @@
     const kids = LG.Rel.all(p, 'child');
     const sp = LG.Rel.get(p, 'spouse');
     const reg = S().liveRegion(p);
-    const L = reg.living * (typeof window.__K === 'number' ? window.__K : 1.2);
+    // 생활비 지수: 지역 차이는 집세(rent)에서 크게 나므로, 생활비 자체의 지역 격차는 절반쯤으로 줄여 본다
+    const L = (1 + (reg.living - 1) * 0.55) * (typeof window.__K === 'number' ? window.__K : 1.2);
 
     // 변동 소득 직업: 해마다 출렁인다
     if (p.job) {
@@ -90,7 +93,7 @@
       if (c.age >= 8 && c.age <= 18 && S().has(p, 'kid_arts')) fixedFamily += 300;
     });
     // 재량 지출 비율: 사회초년생은 쓰고(소비·학자금·월세), 중년은 모으고(집·노후), 은퇴 후엔 다시 쓴다
-    const mc = p.age < 30 ? 0.55 : p.age < 52 ? 0.58 : 1;
+    const mc = p.age < 30 ? 0.55 : p.age < 52 ? 0.64 : 1;   // 중년 재량 지출(통계 목표 대비 자산이 2배 가까이 불던 것을 낮춤)
     cost += fixedFamily;
     // 주거비
     if (!p.house && (p.home === 'rent' || p.home === 'abroad')) {
@@ -125,7 +128,7 @@
     // 모아 둔 돈이 많으면 씀씀이도 커진다(자산 효과). 은퇴 뒤에는 모은 돈을 조금씩 헐어 쓰고 자녀·손주에게도 쓴다
     {
       const fin = Math.max(0, p.money) + (LG.Invest ? LG.Invest.total(p) : 0);
-      const rate = p.age >= 75 ? 0.06 : p.age >= 62 ? 0.045 : p.age >= 45 ? 0.02 : 0.012;
+      const rate = p.age >= 75 ? 0.075 : p.age >= 62 ? 0.06 : p.age >= 45 ? 0.025 : 0.012;
       cost += Math.max(0, fin - 5000) * rate * SM.cost;
     }
 

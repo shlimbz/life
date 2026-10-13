@@ -123,7 +123,7 @@
   ch({
     id: 'tc_hackathon', cat: 'tech', ages: [17, 27], dom: ['tech'], icon: '⌨️', label: '기술', w: 14,
     if: p => A(p, 'tech') >= 28 && (has(p, 'coding_kid') || has(p, 'coder') || p.major === 'it' || has(p, 'vocational') || jobIs(p, 'developer')),
-    title: '48시간 해커톤', text: '학교(회사) 근처에서 해커톤이 열린다. 모르는 사람들과 팀을 짜서 48시간 안에 서비스를 만들어야 한다. 잠은 포기해야 한다.',
+    title: '48시간 해커톤', text: p => `${p.job ? '회사' : ['college', 'student', 'grad'].indexOf(p.status) >= 0 ? '학교' : '집'} 근처에서 해커톤이 열린다. 모르는 사람들과 팀을 짜서 48시간 안에 서비스를 만들어야 한다. 잠은 포기해야 한다.`,
     choices: [
       { id: 'join', label: '팀에 합류해 밤을 샌다', intent: 'adventure',
         check: { base: 40, partial: 0.5, f: [['stat', 'intelligence', 0.3], ['eff', 'study', 0.2], ['stat', 'social', 0.15], ['talent', 'mechanical', 8], ['flag', 'coder', 6, '개발 경험']] },

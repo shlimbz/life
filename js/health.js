@@ -44,6 +44,17 @@
     if (J) d += J.hp;
     d += (S().regionAttr(p, 'medical') - 60) * 0.008;
     if (S().has(p, 'chronic')) d -= 0.5;
+    // 앓고 있는 병은 몸을 조금씩 갉아먹는다 (예전엔 치료 안 한 암이 건강 수치를 깎지 않아, 암으로 떠나도 '건강 95'로 끝났다)
+    const dz = p.dz || {};
+    if (dz.cancer && LG.Disease) {
+      const sv = LG.Disease.CANCERS[dz.cancer.type].surv, stt = dz.cancer.status;
+      if (stt === 'untreated') d -= 1 + (1 - sv) * 10 + (dz.cancer.early ? 0 : 1.5);
+      else if (stt === 'partial') d -= 0.8 + (1 - sv) * 5;
+      else if (stt === 'terminal') d -= 6;
+    }
+    if (dz.heart && dz.heart.status !== 'managed') d -= 0.5;
+    if (dz.stroke && dz.stroke.status === 'disabled') d -= 0.8;
+    if (dz.dementia) d -= 0.6;
     d += R().float(p, -0.8, 0.8);
     S().addStat(p, 'health', d);
 

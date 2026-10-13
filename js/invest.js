@@ -102,8 +102,19 @@
   const wSum = w => KEYS.reduce((a, k) => a + (w[k] || 0), 0);
 
   // 남는 현금으로 목표 비율까지 채운다 (팔지는 않고 사기만 한다 → 해마다 비율이 유지된다)
+  // 나이가 들수록 위험 자산 비중을 줄인다 (빠르게 고르기 방식일 때만 — 직접 정한 비율은 존중한다)
+  // 예전엔 80대에도 '공격' 방식 그대로 코인을 사 모아, 노년에 코인 폭락을 여러 번 맞았다
+  function ageWeights(p) {
+    const w = Object.assign({}, weights(p));
+    if (p.invW || p.age < 55) return w;
+    const k = U().clamp((75 - p.age) / 20, 0, 1);   // 55세 1 → 75세 0
+    const cut = Math.round((w.crypto || 0) * (1 - k)) + Math.round((w.stock || 0) * (1 - k) * 0.5);
+    w.crypto = Math.round((w.crypto || 0) * k); w.stock = Math.round((w.stock || 0) * (1 - (1 - k) * 0.5));
+    w.deposit = (w.deposit || 0) + cut;
+    return w;
+  }
   function deploy(p, amount) {
-    const w = weights(p);
+    const w = ageWeights(p);
     if (amount <= 0 || wSum(w) <= 0) return 0;
     const base = amount + total(p);
     let used = 0;
@@ -177,6 +188,12 @@
     // 연금저축 납입
     if (S().has(p, 'private_pension') && p.job && p.age < 60 && p.money > 600) { p.money -= 300; p.inv.deposit += 300; }
 
+    // 은퇴 무렵부터는 코인을 조금씩 예금으로 옮긴다 (직접 정한 비율이면 그대로 둔다)
+    if (!p.invW && p.age >= 62 && (p.inv.crypto || 0) >= 100) {
+      const x = Math.round(p.inv.crypto * (p.age >= 70 ? 0.5 : 0.25));
+      p.inv.crypto -= x; p.inv.deposit += x;
+      if (!S().has(p, 'derisked')) { S().flag(p, 'derisked'); lines.push({ t: '나이가 들수록 잃지 않는 게 중요해졌다. 코인과 주식 비중을 조금씩 예금으로 옮기기 시작했다.', icon: '🏦' }); }
+    }
     // 남는 현금은 정해 둔 방식대로 굴린다
     if (p.invPolicy && wSum(weights(p)) > 0 && (p.age >= 19 || S().has(p, 'kid_investor'))) {
       const extra = p.money - reserve(p);
@@ -199,15 +216,15 @@
     } else if (m.cryptoRet <= -0.6 && coin >= 300 && cd('newsCoinDown')) {
       lines.push({ t: `코인이 폭락했다(${Math.round(m.cryptoRet * 100)}%).` + R().pick(p, [' 잔고가 반의 반 토막이 났다.', ' 커뮤니티가 장례식장 분위기다.', ' 어제의 수익은 꿈처럼 사라졌다.']), icon: '💥', major: true });
     }
-    if (pl <= -3000 && before >= 6000 && cd('newsPL')) lines.push({ t: `올해 투자 손익은 ${U().money(pl)}원.` + R().pick(p, [' 쓰라린 한 해였다.', ' 수업료치고는 비싸다.', ' 한숨이 절로 나온다.']), icon: '😮‍💨' });
-    else if (pl >= Math.max(3000, before * 0.12) && before >= 6000 && (p.cool.m_gain || 0) <= p.age && (p.cool.m_gain = p.age + 3)) lines.push({ t: `올해 투자로 ${U().money(pl)}원을 벌었다.` + R().pick(p, ['', ' 복리의 힘이 보이기 시작한다.', ' 인내가 보상받았다.']), icon: '💹' });
+    if (pl <= -3000 && before >= 6000 && cd('newsPL')) lines.push({ t: `올해 투자 손익은 ${U().money(pl)}원.` + R().pick(p, [' 쓰라린 한 해였다.', ' 수업료치고는 비싸다.', ' 한숨이 절로 나온다.']), icon: '😮‍💨', pl: true });
+    else if (pl >= Math.max(3000, before * 0.12) && before >= 6000 && (p.cool.m_gain || 0) <= p.age && (p.cool.m_gain = p.age + 3)) lines.push({ pl: true, t: `올해 투자로 ${U().money(pl)}원을 벌었다.` + R().pick(p, ['', ' 복리의 힘이 보이기 시작한다.', ' 인내가 보상받았다.']), icon: '💹' });
     // 부동산 소식: 집·투자용 부동산이 있으면 시세 변화를 체감한다. 집이 없으면 상승기가 마음을 조급하게 만든다
     const ownRE = (p.house ? p.house.value : 0) + (p.prop ? p.prop.value : 0);
     if (ownRE > 0 && Math.abs(local) >= 0.05 && (p.cool.reNews || 0) <= p.age) {
-      p.cool.reNews = p.age + 2;
+      p.cool.reNews = p.age + 3;
       const up = reGain > 0;
-      lines.push({ t: up ? R().pick(p, [`${S().liveRegion(p).short} 집값이 올랐다(${local >= 0 ? '+' : ''}${Math.round(local * 100)}%). 부동산 앱의 시세를 몇 번이고 새로고침했다.`, `동네 아파트 실거래가가 또 올랐다(+${Math.round(local * 100)}%). 괜히 마음이 든든하다.`])
-        : R().pick(p, [`${S().liveRegion(p).short} 집값이 떨어졌다(${Math.round(local * 100)}%). 대출 이자는 그대로인데 시세만 빠진다.`, `부동산 경기가 얼어붙었다(${Math.round(local * 100)}%). 급매물 현수막이 늘었다.`]), icon: up ? '🏘️' : '🏚️', major: Math.abs(reGain) >= 5000 });
+      lines.push({ t: up ? R().pick(p, [`${S().liveRegion(p).short} 집값이 올랐다(${local >= 0 ? '+' : ''}${Math.round(local * 100)}%). 부동산 앱의 시세를 몇 번이고 새로고침했다.`, `동네 아파트 실거래가가 또 올랐다(+${Math.round(local * 100)}%). 괜히 마음이 든든하다.`, `엘리베이터에서 만난 이웃이 "요즘 우리 아파트 얼마인지 알아요?" 하고 물었다(+${Math.round(local * 100)}%).`, `집값이 ${Math.round(local * 100)}% 올랐다. 팔 것도 아닌데 괜히 계산기를 두드려 본다.`])
+        : R().pick(p, [`${S().liveRegion(p).short} 집값이 떨어졌다(${Math.round(local * 100)}%). 대출 이자는 그대로인데 시세만 빠진다.`, `부동산 경기가 얼어붙었다(${Math.round(local * 100)}%). 급매물 현수막이 늘었다.`, `우리 동네 시세가 ${Math.round(local * 100)}% 빠졌다. 사는 집이니 괜찮다고 스스로를 달랜다.`, `중개사무소 유리창의 매물 가격이 하나둘 내려갔다(${Math.round(local * 100)}%).`]), icon: up ? '🏘️' : '🏚️', major: Math.abs(reGain) >= 5000 });
     } else if (!ownRE && p.age >= 28 && p.age <= 55 && m.re === 'boom' && local >= 0.06 && (p.cool.reNews || 0) <= p.age && p.liveIn !== 'abroad') {
       p.cool.reNews = p.age + 4;
       lines.push({ t: `${S().liveRegion(p).short} 집값이 또 뛰었다(+${Math.round(local * 100)}%). 내 집 마련이 한 걸음 멀어진 기분이다.`, icon: '🏘️', fx: '스트레스 +3' });
@@ -224,9 +241,10 @@
       if (ratio >= 0.25) S().addStat(p, 'mental', 1);          // 큰 성공은 자신감이 된다
       if (ratio <= -0.25) S().addStat(p, 'mental', 1);         // 큰 손실을 버틴 경험도 단단함이 된다
       const fx = [dh ? `행복 ${dh > 0 ? '+' : ''}${dh}` : '', ds ? `스트레스 ${ds > 0 ? '+' : ''}${ds}` : '', Math.abs(pl) >= 50 ? `투자 손익 ${pl > 0 ? '+' : ''}${U().money(pl)}` : '', Math.abs(reGain) >= 50 ? `부동산 ${reGain > 0 ? '+' : ''}${U().money(reGain)}` : ''].filter(Boolean).join(' · ');
-      const last = lines.length ? lines[lines.length - 1] : null;
-      if (last) last.fx = last.fx ? last.fx + ' · ' + fx : fx;
-      else if (Math.abs(ratio) >= 0.15 && Math.abs(pl) >= 1000) lines.push({ t: pl + reGain > 0 ? '자산이 불었다.' : '자산이 줄었다.', fx, icon: pl > 0 ? '💹' : '😮‍💨' });
+      // 변화량은 '올해 투자 손익' 줄에만 붙인다 (예전엔 마지막 줄—폭락 뉴스·집값 뉴스—에 붙어 "증시 폭락 (행복 +4)"처럼 보였다)
+      const plLine = lines.find(l => l.pl);
+      if (plLine) plLine.fx = plLine.fx ? plLine.fx + ' · ' + fx : fx;
+      else lines.push({ t: pl + reGain > 0 ? `올해 자산이 불었다 (투자·집값 합계 +${U().money(pl + reGain)}).` : `올해 자산이 줄었다 (투자·집값 합계 ${U().money(pl + reGain)}).`, fx, icon: pl + reGain > 0 ? '💹' : '😮‍💨' });
     }
     return lines;
   }

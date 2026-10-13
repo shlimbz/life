@@ -20,7 +20,7 @@
 
   // ───────────── 처음으로 돈을 굴리기 시작할 때 ─────────────
   E.push({
-    id: 'm_asset_start', cat: 'money', tier: 'major', ages: [20, 60], milestone: true, prio: 4, icon: '💰',
+    id: 'm_asset_start', light: true, cat: 'money', tier: 'major', ages: [20, 60], milestone: true, prio: 4, icon: '💰',
     if: p => !has(p, 'asset_start') && p.liveIn !== 'abroad_none' && ((!!p.job && p.job.years >= 1 && H.cash(p) >= 300) || H.cash(p) >= 2500),
     label: '자산관리', title: p => p.job ? '월급, 어떻게 굴릴까' : '목돈이 생겼다',
     text: p => (p.job ? `통장에 월급이 쌓이기 시작했다. 지금 ${U().money(p.money)}원. 이대로 두면 물가에 조금씩 녹아내릴 텐데, 어떻게 할까?` : `통장에 ${U().money(p.money)}원이 모였다. 이 돈을 어떻게 굴릴지 정해야 한다.`) + ' (투자 방식은 나중에 상태 > 자산에서 언제든 바꿀 수 있다)',
@@ -80,7 +80,7 @@
     id: 'm_fomo', cat: 'money', tier: 'choice', queued: true, cd: 10, icon: '🪙',
     if: p => p.inv && p.inv.crypto < 200 && H.cash(p) >= 500,
     label: '코인 열풍', title: '다들 벌었다는데',
-    text: '코인 시세가 하늘을 찌른다. 점심시간마다 동료들이 수익률을 자랑한다. "너만 안 하냐?"라는 말이 귀에 박힌다.',
+    text: p => '코인 시세가 하늘을 찌른다. ' + (p.job ? '점심시간마다 동료들이 수익률을 자랑한다.' : p.age >= 60 ? '동창 단톡방에도 수익 인증 사진이 올라온다. 뉴스마다 "노후를 코인으로"라는 말이 나온다.' : p.status === 'college' ? '과방에서도 다들 차트 이야기뿐이다.' : '단톡방마다 수익 인증이 올라온다.') + ' "너만 안 하냐?"라는 말이 귀에 박힌다.',
     choices: [
       { id: 'join', label: '나도 올라탄다', intent: 'risk',
         out: { t: '', log: '코인 열풍에 뛰어듦', sr: 6, hp: 3, flag: ['gambler', 'crypto_fomo_done'], fn: p => { const v = Math.round(Math.min(H.cash(p) * 0.45, 4000) / 100) * 100; p.money -= v; p.inv.crypto += v; return `${U().money(v)}원을 코인에 넣었다. 이미 많이 오른 뒤라는 사실이 마음에 걸린다.`; } } },
@@ -251,8 +251,9 @@
   };
   H.toRehab = toRehab;
   E.push({
-    id: 'm_collect', cat: 'crisis', tier: 'major', queued: true, icon: '📵',
-    cd: p => LG.Loans.amount(p, 'private') > 0 ? 1 : 2,
+    id: 'm_collect', cat: 'crisis', tier: 'major', queued: true, soft: true, icon: '📵',
+    // 독촉은 해마다 '선택'으로 띄우지 않는다: 한 번 고른 뒤 몇 해는 알림 줄로만 흐르고, 정해진 갈림길(구직 등)에 자리를 양보한다 (soft)
+    cd: p => LG.Loans.amount(p, 'private') > 0 ? 2 : 3,
     if: p => LG.Loans.amount(p, 'private') + LG.Loans.amount(p, 'credit') > 0,
     label: '독촉', title: p => LG.Loans.amount(p, 'private') > 0 ? '대부업체의 전화' : '연체 독촉',
     text: p => {
@@ -271,7 +272,7 @@
       { id: 'rehab', label: '신용회복위원회에 채무조정을 신청한다', intent: 'stability', if: p => has(p, 'delinquent') || LG.Loans.amount(p, 'private') > 0,
         check: { base: 62, partial: 0, f: [['fn', p => p.job ? { label: '꾸준한 소득', v: 8 } : { label: '소득 없음', v: -8 }]] },
         out: { success: { t: '', log: '채무조정 신청', hp: 4, sr: -12, fn: toRehab(0.3) }, fail: { t: '서류가 반려됐다. 다시 준비해야 한다.', sr: 8, hp: -4 } } },
-      { id: 'avoid', label: '전화를 받지 않는다', intent: 'rest', out: { t: '휴대폰을 무음으로 돌렸다. 하지만 이자는 무음이 안 된다.', log: '독촉 전화를 피함', hp: -6, sr: 12, fn: p => { LG.Loans.init(p).forEach(l => { if (l.k === 'private' || l.k === 'credit') { l.amt = Math.round(l.amt * 1.05); l.late = (l.late || 0) + 1; } }); LG.Loans.sync(p); p.queue.push({ id: 'm_collect', at: p.age + 1 }); return ''; } } }
+      { id: 'avoid', label: '전화를 받지 않는다', intent: 'rest', out: { t: '휴대폰을 무음으로 돌렸다. 하지만 이자는 무음이 안 된다.', log: '독촉 전화를 피함', hp: -6, sr: 12, fn: p => { LG.Loans.init(p).forEach(l => { if (l.k === 'private' || l.k === 'credit') { l.amt = Math.round(l.amt * 1.05); l.late = (l.late || 0) + 1; } }); LG.Loans.sync(p); p.queue.push({ id: 'm_collect', at: p.age + 2 }); return ''; } } }
     ]
   });
 
@@ -298,6 +299,15 @@
         check: { base: 55, partial: 0, f: [['fn', p => lateLoan(p).k === 'student' ? { label: '학자금은 유예 제도가 있다', v: 25 } : null], ['fn', p => p.job ? { label: '꾸준한 소득', v: 8 } : { label: '소득 없음', v: -6 }], ['stat', 'intelligence', 0.15]] },
         out: { success: { t: '', log: '대출 상환 유예', sr: -6, fn: p => { const l = lateLoan(p); l.late = 0; l.left += 2; l.pause = p.age + 2; return '상환이 2년 미뤄지고 기간도 늘어났다. 이자는 계속 붙지만 연체는 피했다.'; } },
           fail: { t: '요건이 맞지 않는다며 거절당했다.', sr: 6, hp: -3 } } },
+      // 주담대가 밀렸으면: 경매로 넘어가기 전에 스스로 파는 길 (경매보다 덜 잃는다)
+      { id: 'sellhouse', label: '경매로 넘어가기 전에 집을 급매로 판다', intent: 'stability', if: p => !!p.house && lateLoan(p).k === 'mortgage',
+        out: { t: '', log: '집을 급매로 팔아 대출을 정리', hp: -8, sr: -6, fn: p => {
+          const v = Math.round(p.house.value * 0.93), owe = LG.Loans.amount(p, 'mortgage');
+          const paid = LG.Loans.pay(p, Math.min(v, owe), ['mortgage']);
+          p.money += v - paid; p.house = null; p.home = 'rent';
+          const rest = LG.Loans.amount(p, 'mortgage'); if (rest > 0) { LG.Loans.pay(p, rest, ['mortgage']); LG.Loans.add(p, 'credit', rest); }
+          return `시세보다 조금 싸게 ${M(v)}원에 내놓았더니 금방 팔렸다. 대출을 갚고 ${v > paid ? M(v - paid) + '원이 남았다' : '남은 빚은 신용대출로 돌렸다'}. 다시 전·월세로 돌아간다.`;
+        } } },
       { id: 'cut', label: '허리띠를 졸라매고 스스로 마련한다', intent: 'independence',
         check: { base: 40, partial: 0, f: [['stat', 'mental', 0.25], ['fn', p => p.job ? { label: '꾸준한 소득', v: 10 } : { label: '소득 없음', v: -15 }]] },
         out: { success: { t: '', log: '밀린 대출을 스스로 메움', hp: -2, sr: 6, st: { mental: 2 }, fn: p => { const l = lateLoan(p); const d = yearDue(l); I().raise(p, Math.max(0, d - p.money)); const x = Math.min(Math.max(0, p.money), d); p.money -= x; LG.Loans.pay(p, x, [l.k]); if (x >= d * 0.9) l.late = 0; return x >= d * 0.9 ? `외식과 약속을 끊고 ${M(x)}원을 메웠다. 연체 기록은 남지 않았다.` : `${M(x)}원밖에 못 메웠다.`; } },

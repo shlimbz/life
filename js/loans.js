@@ -133,7 +133,8 @@
       const big = b.k === 'mortgage' || b.amt >= 5000;
       const dh = big ? 8 : 3, ds = big ? -6 : -3;
       S().addStat(p, 'happy', dh); S().addStat(p, 'stress', ds);
-      lines.push({ t: big ? `${K.name}을 모두 갚았다! 은행 앱에서 대출 잔액 0원을 한참 바라봤다.` : `${K.name}을 다 갚았다.`, icon: K.icon, major: big, fx: `행복 +${dh} · 스트레스 ${ds}` });
+      const nm = K.name.replace(/\(.*\)$/, ''), eul = U().josa(nm, '을', '를');
+      lines.push({ t: big ? `${nm}${eul} 모두 갚았다! 은행 앱에서 대출 잔액 0원을 한참 바라봤다.` : `${nm}${eul} 다 갚았다.`, icon: K.icon, major: big, fx: `행복 +${dh} · 스트레스 ${ds}` });
       if (b.k === 'mortgage') S().flag(p, 'mortgage_done');
     });
     if (!p.loans.length && before.length && before.some(b => b.amt >= 1000) && !S().has(p, 'debt_free_once')) {
@@ -229,7 +230,10 @@
   function borrow(p, need) {
     const inc = Math.max(1200, p.lastIncome || 0);
     const credit = amount(p, 'credit');
-    const pushed = S().has(p, 'delinquent') || credit + need > inc * 1.2;
+    // 안정적인 직장(공무원·교사·대기업 등)이 있으면 은행 신용대출 한도가 넉넉하다 → 대부업까지 밀려나지 않는다
+    const J = p.job ? LG.DATA.jobs[p.job.id] : null;
+    const stable = !!(J && p.job.id !== 'parttime' && J.stab >= 60);
+    const pushed = (S().has(p, 'delinquent') && !stable) || credit + need > inc * (stable ? 2 : 1.2);
     return add(p, pushed ? 'private' : 'credit', need);
   }
 

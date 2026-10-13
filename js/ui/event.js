@@ -45,7 +45,7 @@
     let done = false;
     card.querySelectorAll('.choice').forEach(b => {
       const c = opts.find(o => o.c.id === b.dataset.id).c;
-      const heavy = confirmOn && (ev.tier === 'major' || ev.milestone || c.confirm || c.intent === 'risk');
+      const heavy = confirmOn && LG.Events.isHeavy(ev, c);
       b.dataset.label = b.querySelector('.lbl').textContent;
       b.addEventListener('click', () => {
         if (done) return;
@@ -109,8 +109,11 @@
     card.scrollTop = 0;
 
     // 피드에도 기록, 현황 패널은 즉시 반영 (카드 뒤가 아니라 아래에 그대로 보인다)
+    // 무대의 캐릭터가 결과에 반응한다 (점프·주저앉기 + 짧은 연출)
+    if (K.scene) { K.scene.update(); K.scene.play(K.scene.forResult(ev, res)); }
     const block = yearBlock(p.age);
-    addLine(block, { t: p.history[p.history.length - 1].t, fx: res.fx, icon: ev.icon, choice: true, res: res.type !== 'done' ? res.type : null });
+    // 결과 배지(성공·실패)가 따로 붙으므로 문장 끝의 "(실패)"는 피드에서 뺀다 (연표에는 남는다)
+    addLine(block, { t: p.history[p.history.length - 1].t.replace(/ \((실패|절반의 성공)\)$/, ''), fx: res.fx, icon: ev.icon, choice: true, res: res.type !== 'done' ? res.type : null });
     updateHUD();
 
     next.addEventListener('click', () => {
@@ -148,6 +151,7 @@
     layer.classList.remove('hidden');
     $('#stage').classList.add('has-event'); document.body.classList.add('ev-open');
     card.scrollTop = 0;
+    if (K.scene) { K.scene.update(); K.scene.play(K.scene.forCard(c, glad)); }
     card.querySelector('.ev-next').addEventListener('click', () => {
       if (cards.length > 1) return openNotice(cards.slice(1), done);
       layer.classList.add('hidden'); $('#stage').classList.remove('has-event'); document.body.classList.remove('ev-open'); st.eventOpen = false;

@@ -7,7 +7,13 @@
   const CREATIVE = ['artist', 'musician', 'writer', 'creator', 'freelancer', 'designer'];
 
   // 집값 = 지역 기준 시세 × 부동산 시장 지수(상승기엔 비싸지고 침체기엔 싸진다)
+  const auto0 = e => E.push(Object.assign({ tier: 'auto' }, e));
   H.housePrice = p => Math.round(S().liveRegion(p).rent * 70 * ((!p.urban && !p.liveIn) ? 0.6 : 1) * ((p.mkt && p.mkt.reIdx) || 1) / 100) * 100;
+  H.maxMortgage = p => {
+    const inc = p.lastIncome || LG.Economy.salary(p);
+    const room = Math.max(0, inc * 0.22 - LG.Loans.dueEstimate(p));
+    return Math.round(room / 0.075 / 100) * 100;
+  };
   H.buyHouse = (scale, label) => p => {
     let price = Math.round(H.housePrice(p) * scale / 100) * 100;
     const want = Math.round(price * 0.5);
@@ -20,9 +26,12 @@
       p.money += help;
     }
     if (p.money < want && LG.Invest) LG.Invest.raise(p, want - p.money);
-    const down = Math.min(Math.max(0, p.money), want);
-    // 대출 한도(DSR): 원리금이 연 소득의 40%를 넘지 않게 → 한도를 넘으면 그만큼 작은 집을 산다
-    const maxLoan = Math.round(Math.max(3000, (p.lastIncome || LG.Economy.salary(p)) * 5.3) / 100) * 100;
+    // 비상금(몇 달 치 생활비)은 남겨 두고 계약금을 낸다 — 통장을 0원으로 만들고 집을 사면 이듬해 바로 연체된다
+    const keep = LG.Invest ? Math.min(LG.Invest.reserve(p), Math.max(0, p.money) * 0.3) : 0;
+    const down = Math.min(Math.max(0, p.money - keep), want);
+    // 대출 한도: 이미 내고 있는 대출 원리금까지 합쳐 연 소득의 약 22% 안에서만(게임 속 생활비를 내고 남는 몫) (30년 원리금 ≈ 대출액의 7.5%/년)
+    // (예전엔 소득×5.3배를 빌려 줘서, 게임 속 생활비까지 내고 나면 1~2년 만에 연체 → 경매로 가는 일이 잦았다)
+    const maxLoan = H.maxMortgage(p);
     let smaller = false;
     if (price - down > maxLoan) { price = down + maxLoan; smaller = true; }
     p.money -= down; LG.Loans.add(p, 'mortgage', price - down);
@@ -281,6 +290,8 @@
     label: '일자리', title: p => p.jobHistory.length ? '다시 일자리를 찾아서' : '첫 직장',
     text: p => p.jobHistory.length
       ? `${p.age}세. 다시 이력서를 쓴다. 어떤 일을 찾아볼까?`
+      // 첫 직장을 오래 못 구했으면 '졸업장을 받았다'를 되풀이하지 않는다
+      : (p.seekTries || 0) >= 2 && p.age >= 24 ? `${p.age}세. 아직 첫 직장을 구하지 못했다. 서류 탈락 문자에도 이제 덤덤하다. 이번엔 어디에 이력서를 낼까?`
       : (p.edu === 'college' || p.edu === 'grad') ? '졸업장을 받았다. 이제 진짜 사회로 나갈 시간이다.' : '이력서를 쓰는 손이 어색하다. 어떤 일을 할까?',
     wait: '연락을 기다리는 중',
     choices: JOB_CHOICES
@@ -518,6 +529,40 @@
     ]
   });
 
+  // ───── 결혼 생활의 균열: 상대도 떠날 수 있다 (예전엔 이혼이 플레이어 선택으로만, 0.2%) ─────
+  E.push({
+    id: 'r_spouse_leave', cat: 'marriage', tier: 'major', ages: [27, 80], cd: 5, icon: '🧳',
+    w: p => { const s = H.rel(p, 'spouse'); return s ? 10 + Math.max(0, 45 - s.rel) * 3 : 0; },
+    if: p => { const s = H.rel(p, 'spouse'); return !!s && s.rel < 44; },
+    label: '부부의 위기', title: '{spouse}이(가) 이혼을 꺼냈다',
+    text: p => `"우리, 이제 그만하는 게 좋겠어." 식탁 너머 {spouse}의 목소리가 담담했다. 오래 고민한 얼굴이었다.${H.kids(p).some(c => c.age < 20) ? ' 아이 방의 불은 아직 켜져 있다.' : ''}`,
+    choices: [
+      { id: 'hold', label: '잘못을 인정하고 붙잡는다', intent: 'family',
+        check: { base: 34, partial: 0.4, f: [['rel', 'spouse', 0.6], ['stat', 'social', 0.2], ['fn', p => H.kids(p).some(c => c.age < 20) ? { label: '아이들', v: 8 } : null], ['stress', 0.2]] },
+        out: {
+          success: { t: '밤새 울며 이야기했다. "한 번만 더 해 보자." 부부 상담 예약을 함께 잡았다.', log: '이혼 위기를 넘김', rel: { spouse: 22 }, hp: 4, sr: -4, flag: 'family_time' },
+          partial: { t: '일단 별거하며 생각할 시간을 갖기로 했다. 집이 넓게 느껴진다.', rel: { spouse: 8 }, hp: -8, sr: 10 },
+          fail: { t: '이미 마음이 떠난 사람을 붙잡을 수는 없었다.', log: '배우자의 요구로 이혼', hp: -18, sr: 14, fn: p => { LG.Rel.divorce(p); return ''; } }
+        } },
+      { id: 'kids', label: '아이가 클 때까지만 함께 살자고 한다', intent: 'family', if: p => H.kids(p).some(c => c.age < 18),
+        out: { t: '서류 없는 합의. 한집에 살지만 대화는 아이 이야기뿐이다.', log: '아이를 위해 이혼을 미룸', hp: -10, sr: 8, rel: { spouse: 4, children: 2 }, flag: 'cold_marriage' } },
+      { id: 'accept', label: '받아들인다', intent: 'independence',
+        out: { t: '서로 탓하지 않기로 했다. 도장을 찍고 나오는 길, 하늘이 이상하게 맑았다.', log: '합의 이혼', hp: -14, sr: 8, fn: p => { LG.Rel.divorce(p); return ''; } } }
+    ]
+  });
+
+  // 결혼 생활의 흔한 마찰 — 선택 없이 지나가지만 관계를 조금씩 흔든다
+  auto0({ id: 'a_marriage_strain', cat: 'marriage', ages: [28, 75], cd: 3, icon: '🌧️',
+    if: p => !!H.rel(p, 'spouse'),
+    w: p => 3 + (p.stress > 65 ? 4 : 0) + (has(p, 'workaholic') ? 4 : 0) + (p.debt > 0 && p.money <= 0 ? 4 : 0) + (H.kids(p).some(c => c.age < 4) ? 3 : 0),
+    auto: { t: p => LG.RNG.pick(p, [
+      '명절 이후로 {spouse}와(과) 말수가 줄었다. 양가 이야기가 나오면 공기가 차가워진다.',
+      '집안일 분담 문제로 또 언성이 높아졌다. 서로 지쳐 있다는 건 알지만.',
+      '돈 이야기만 나오면 싸움이 된다. 통장 잔고가 부부 사이에도 그늘을 드리운다.',
+      '각자 휴대폰만 보다 잠드는 밤이 늘었다.',
+      '{spouse}의 생일을 깜빡했다. 사과는 받아 줬지만 서운한 눈치가 오래갔다.'
+    ]), rel: { spouse: -9 }, hp: -3, sr: 4 } });
+
   E.push({
     id: 'r_couple_fight', cat: 'relationship', tier: 'choice', ages: [17, 70], w: 5, cd: 4, icon: '⛈️',
     if: p => !!H.rel(p, 'partner'),
@@ -536,8 +581,9 @@
 
   E.push({
     id: 'r_marriage_crisis', cat: 'marriage', tier: 'major', ages: [28, 80], cd: 4, icon: '🥀',
-    w: p => { const s = H.rel(p, 'spouse'); return s ? Math.max(0, 55 - s.rel) * 1.2 : 0; },
-    if: p => { const s = H.rel(p, 'spouse'); return !!s && s.rel < 52; },
+    // 관계가 식기 시작하면(58 미만) 위기가 찾아온다 — 예전엔 52 미만이어야 해서 한 판에 거의 나오지 않았다
+    w: p => { const s = H.rel(p, 'spouse'); return s ? 6 + Math.max(0, 62 - s.rel) * 2.5 : 0; },
+    if: p => { const s = H.rel(p, 'spouse'); return !!s && s.rel < 58; },
     label: '부부의 위기', title: '같은 집, 다른 마음',
     text: '{spouse}와(과) 대화가 사라진 지 오래다. 같은 집에 사는 남 같다.',
     choices: [
@@ -634,17 +680,25 @@
     label: '가족', title: p => ['아이를 가질까', '둘째 이야기', '셋째 이야기', '넷째 이야기'][H.kids(p).length] || '또 한 명의 가족?',
     text: p => {
       const n = H.kids(p).length, tight = p.money + (p.inv ? LG.Invest.total(p) : 0) < 1500;
+      if (has(p, 'infertility')) return `${p.age - p.flags.infertility}년 전 난임 판정을 받은 뒤로 병원 이야기는 서로 꺼내지 않았다. 그래도 {spouse}이(가) 조심스럽게 시험관 시술 상담을 받아 보자고 했다.`;
       if (n === 0) return '{spouse}와(과) 아이 이야기를 꺼냈다. 우리가 부모가 될 수 있을까?';
       if (n === 1) return '{spouse}와(과) 둘째 이야기가 나왔다. {child}이(가) 동생을 갖고 싶어 한다.';
       return `아이가 ${n}명인데 ${n === 2 ? '{spouse}가 셋째 이야기를 슬쩍 꺼냈다' : '또 한 명이 생길 수도 있다는 이야기가 나왔다'}.` + (tight ? ' 살림은 빠듯하지만, 형제가 많은 집이 더 북적이고 든든하다는 말도 있다.' : ' 집은 이미 북적인다.') + ' 어떻게 할까?';
     },
     choices: [
-      { id: 'yes', label: p => ['아이를 갖는다', '둘째를 갖는다', '셋째를 갖는다', '넷째를 갖는다'][H.kids(p).length] || '아이를 갖는다', intent: 'family',
+      // 난임 판정 뒤에는 같은 선택지를 같은 확률로 반복하지 않는다 → 시험관 시술(비용·확률이 다르다)
+      { id: 'ivf', label: '시험관 시술에 도전한다', intent: 'family', if: p => has(p, 'infertility'),
+        check: { base: 46, partial: 0, f: [['ageOver', 34, 3], ['health', 0.2], ['assets', 0.15]] },
+        out: {
+          success: { t: '', log: '시험관 시술 끝에 임신', hp: 14, rel: { spouse: 8 }, money: -900, fn: p => { S().unflag(p, 'infertility'); const k = conceive(p, 'plan'); return `세 번째 시술 만에 두 줄을 봤다. 병원 주차장에서 {spouse}와(과) 한참을 울었다. 내년이면 ${k}를 만난다.`; } },
+          fail: { t: '주사와 기다림을 몇 번이나 반복했지만 이번에도 소식이 없었다.', hp: -12, sr: 14, money: -900, rel: { spouse: 2 } }
+        } },
+      { id: 'yes', label: p => ['아이를 갖는다', '둘째를 갖는다', '셋째를 갖는다', '넷째를 갖는다'][H.kids(p).length] || '아이를 갖는다', intent: 'family', if: p => !has(p, 'infertility'),
         check: { base: 74, partial: 0.5, f: [['ageOver', 34, 2.6], ['health', 0.2], ['rel', 'spouse', 0.15]] },
         out: {
           success: { t: '', log: p => nth(p.flags.pregnant ? p.flags.pregnant.n : H.kids(p).length) + ' 임신', hp: 8, rel: { spouse: 5 }, fn: p => { const k = conceive(p, 'plan'); return `임신 소식을 들었다! {spouse}와(과) 한참을 붙잡고 웃었다. 내년이면 ${k}를 만난다.`; } },
           partial: { t: '아이가 쉽게 찾아오지 않았다. 마음이 지쳐 간다.', sr: 10, hp: -6 },
-          fail: { t: '난임 판정을 받았다. 병원을 오가는 날들이 길어진다.', sr: 14, hp: -10, money: -500 }
+          fail: { t: '난임 판정을 받았다. 병원을 오가는 날들이 길어진다.', sr: 14, hp: -10, money: -500, flag: 'infertility' }
         } },
       { id: 'later', label: '아직은 둘만의 시간을', intent: 'love', if: p => H.kids(p).length === 0, out: { t: '조금 더 둘이서 지내기로 했다.', rel: { spouse: 3 } } },
       { id: 'no', label: p => H.kids(p).length ? '지금으로 충분하다' : '아이 없이 살기로 한다', intent: 'independence',
@@ -1032,7 +1086,9 @@
     milestone: p => (!!H.rel(p, 'spouse') || p.age >= 34) && p.age <= 55, prio: 1,
     // 결혼·아이가 생기면 내 집 고민이 커진다 (한국 40대 자가 보유율 약 60%)
     w: p => 14 + (H.rel(p, 'spouse') ? 16 : 0) + (H.kids(p).length ? 12 : 0) + (p.age >= 33 && p.age <= 50 ? 8 : 0) + (p.mkt && p.mkt.re === 'slump' ? 6 : 0),
-    if: p => !p.house && !!p.job && LG.State.netWorth(p) >= H.housePrice(p) * 0.1 && p.liveIn !== 'abroad',
+    // 빌릴 수 있는 돈 + 모은 돈으로 외곽 집(시세의 약 40%)이라도 살 수 있을 때만 '내 집' 고민이 현실이 된다
+    if: p => !p.house && !!p.job && LG.State.netWorth(p) >= H.housePrice(p) * 0.1 && p.liveIn !== 'abroad'
+      && Math.max(0, p.money) + LG.Invest.total(p) + H.maxMortgage(p) >= H.housePrice(p) * 0.4,
     label: '내 집 마련', title: '집을 살까',
     text: p => `${S().liveRegion(p).short} 집값이 또 올랐다는 뉴스가 나온다. 시세는 ${LG.U.money(H.housePrice(p))}원. 지금이라도 사야 할까?`,
     choices: [

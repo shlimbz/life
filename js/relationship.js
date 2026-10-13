@@ -195,6 +195,11 @@
             lines.push({ t: `배우자 ${n.name}이(가) ${n.age}세로 먼저 세상을 떠났다.`, major: true, icon: '🕯️', card: { title: '배우자와의 이별', icon: '🕯️', text: `평생을 함께한 ${n.name.slice(1)}이(가) ${n.age}세로 먼저 떠났다. 집 안의 모든 물건이 그 사람을 기억한다.`, deltas: [dl('happy', -22)] }, fx: '행복 -22' });
             p.happy = U().clamp(p.happy - 22, 0, 100);
             S.flag(p, 'widowed'); S.unflag(p, 'married');
+          } else if (n.role === 'partner') {
+            // 연인을 잃으면 알리고, '연애 중' 상태를 정리한다 (예전엔 말없이 사라지고 연애 플래그만 남았다)
+            lines.push({ t: `연인 ${n.name}이(가) ${n.age}세에 갑작스럽게 세상을 떠났다.`, major: true, icon: '🕯️', card: { title: '연인과의 이별', icon: '🕯️', text: `${n.name.slice(1)}이(가) 갑작스럽게 세상을 떠났다. 함께 그리던 내일이 한순간에 사라졌다.`, deltas: [dl('happy', -18), dl('stress', 10)] }, fx: '행복 -18 · 스트레스 +10' });
+            p.happy = U().clamp(p.happy - 18, 0, 100); p.stress = U().clamp(p.stress + 10, 0, 100);
+            S.unflag(p, 'dating'); S.flag(p, 'had_breakup');
           } else if (n.role === 'sibling') {
             lines.push({ t: `형제 ${n.name}을(를) 먼저 떠나보냈다.`, major: true, icon: '🕯️', fx: '행복 -10' });
             p.happy = U().clamp(p.happy - 10, 0, 100);
@@ -242,6 +247,7 @@
         if (S.has(p, 'family_time')) target += 6;
         if (S.hasTrait(p, 'family')) target += 5;
         if (S.has(p, 'workaholic')) target -= 8;
+        if (S.has(p, 'cold_marriage')) target -= Rel.all(p, 'child').some(c => c.age < 18) ? 4 : 12;   // 아이를 위해 미뤄 둔 이혼: 아이가 크면 다시 흔들린다
         if (sp.personality === '다정함' || sp.personality === '유쾌함') target += 4;
         if (sp.personality === '엄격함' || sp.personality === '무뚝뚝함') target -= 3;
         sp.rel = U().clamp(sp.rel + (target - sp.rel) * 0.14 + R().float(p, -4, 4), 0, 100);
@@ -254,7 +260,7 @@
         if (S.has(p, 'workaholic') && c.age < 20) d -= 1.5;
         if (S.has(p, 'abroad_alone')) d -= 2;
         c.rel = U().clamp(c.rel + d, 0, 100);
-        if (c.age === 8) lines.push({ t: `${c.name}이(가) 초등학교에 입학했다.`, icon: '🎒' });
+        if (c.age === 7) lines.push({ t: `${c.name}이(가) 초등학교에 입학했다.`, icon: '🎒' });
         // 자녀의 입시: 열아홉 살에 부모로서의 선택(k_child_csat)이 기다린다 → 결과는 그동안의 교육(c.plan)·관계·형편이 만든다
         if (c.age === 19 && !c.uni) p.queue.push({ id: 'k_child_csat', at: p.age });
         if (c.age === 20 && !c.uni) {

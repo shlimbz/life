@@ -142,15 +142,28 @@
   auto({ id: 'a_meet_naturally', cat: 'relationship', ages: [21, 45], w: 4, cd: 3, icon: '☂️', card: true, title: '새로운 인연',
     if: p => H.single(p) && p.status !== 'military',
     check: { base: 40, f: [['stat', 'social', 0.4], ['happy', 0.2], ['trait', 'extrovert', 6]] },
-    out: { success: { t: '비 오는 날 우산을 같이 쓴 것이 인연이 되어 {partner}와(과) 만나기 시작했다.', log: '{partner}와 우연히 만나 연애 시작', major: true, hp: 10, fn: H.lover() }, fail: { skip: true } } });
+    // 만남의 장면을 여러 갈래로 (예전엔 모든 연애가 '비 오는 날 우산'으로 시작했다)
+    out: { success: { t: p => LG.RNG.pick(p, [
+      '비 오는 날 우산을 같이 쓴 것이 인연이 되어 {partner}와(과) 만나기 시작했다.',
+      '친구가 억지로 끌고 간 소개팅 자리였다. 의외로 말이 잘 통한 {partner}와(과) 두 번째 약속을 잡았다.',
+      p.job ? '거래처 미팅에서 처음 본 {partner}에게서 먼저 연락이 왔다. 업무 얘기는 금방 끝나고 사적인 얘기가 길어졌다.' : '동네 도서관에서 늘 같은 자리에 앉던 {partner}와(과) 눈인사를 하다가 커피를 마시게 됐다.',
+      '동호회 뒤풀이에서 집 방향이 같던 {partner}와(과) 같이 걸었다. 그 길이 자꾸 짧게 느껴졌다.',
+      '친구 결혼식 하객석 옆자리였던 {partner}와(과) 연락처를 주고받았다.',
+      '반려견 산책길마다 마주치던 {partner}와(과) 어느새 산책을 같이 하게 됐다.',
+      '데이팅 앱에서 반신반의하며 만난 {partner}. 첫 만남이 세 시간을 넘겼다.',
+      '이사 온 동네 단골 가게에서 자주 마주치던 {partner}와(과) 결국 이름을 묻게 됐다.'
+    ]), log: '{partner}와 우연히 만나 연애 시작', major: true, hp: 10, fn: H.lover() }, fail: { skip: true } } });
 
   auto({ id: 'a_coworker', cat: 'social', ages: [22, 60], w: 3, cd: 8, max: 4, icon: '☕',
     if: p => !!p.job,
     auto: { t: p => LG.RNG.pick(p, ['새로 온 동료와 금방 친해졌다. 점심시간이 즐거워졌다.', '옆 부서 사람과 엘리베이터에서 말을 텄다. 이제 커피 한 잔 같이 마시는 사이다.', '프로젝트를 같이 하다 보니 동료와 가까워졌다. 퇴근 후 맥주 한 잔이 일상이 되었다.', '회식 2차에서 동료와 속 깊은 이야기를 나눴다. 이후 서로 든든한 편이 되었다.']), hp: 3, fn: H.friend(60, '직장 동료') } });
 
+  // 친구 결혼식: 아직 결혼하지 않은 친구가 결혼한다 (예전엔 늘 '첫 친구'가 몇 번이고 결혼했다)
+  const singleFriend = p => LG.Rel.all(p, 'friend').find(f => !f.married);
   auto({ id: 'a_friend_wedding', cat: 'social', ages: [26, 42], w: 3, cd: 4, icon: '💐',
-    if: p => LG.Rel.all(p, 'friend').length > 0,
-    auto: { t: '{friend}의 결혼식에서 축가를 불렀다.', rel: { friends: 4 }, hp: 3 } });
+    if: p => !!singleFriend(p), who: singleFriend,
+    auto: { t: p => LG.RNG.pick(p, ['{who}의 결혼식에서 축가를 불렀다. 떨려서 음이 하나 나갔다.', '{who}의 결혼식 사회를 봤다. 대본을 세 번이나 고쳤다.', '{who}의 결혼식에서 부케를 받았다. 다들 다음은 너라며 웃었다.', '{who}이(가) 결혼했다. 신랑 신부 입장 때 괜히 코끝이 찡했다.']),
+      rel: { friends: 4 }, hp: 3, fn: p => { const f = p.ctx && p.people.find(n => n.id === p.ctx.who); if (f) f.married = true; return ''; } } });
 
   auto({ id: 'a_pet_bye', cat: 'family', ages: [8, 35], w: p => has(p, 'pet') && p.age - p.flags.pet >= ({ 햄스터: 3, 고양이: 14 }[(p.pet || {}).kind] || 11) ? 20 : 0, max: 1, icon: '🌈',
     if: p => has(p, 'pet'),

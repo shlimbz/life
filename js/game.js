@@ -16,9 +16,12 @@
     // 1년 진행 → { lines, event, death }
     advance(p) {
       if (!p.alive) return { lines: [], event: null, death: true };
+      LG.Timeline.mark(p);   // 지난해의 마지막 모습 (인생 지도)
       p.age++; p.year++;
       const lines = [];
+      const fx = l => { l.t = LG.U.fixJosa(l.t); if (l.card) { l.card.text = LG.U.fixJosa(l.card.text); l.card.title = LG.U.fixJosa(l.card.title); } return l; };
       const push = (arr) => arr.forEach(l => {
+        fx(l);
         lines.push(l);
         LG.Timeline.add(p, l.t, l.reflect ? 'reflect' : l.major ? 'major' : 'minor', l.icon);
         if (l.fx) p.history[p.history.length - 1].fx = l.fx;
@@ -33,6 +36,7 @@
       const cause = LG.Health.deathCheck(p);
       if (cause) {
         p.alive = false; p.cause = cause;
+        LG.Timeline.mark(p);
         LG.Timeline.add(p, `${cause} 세상을 떠났다.`, 'death', '🕊️');
         return { lines, event: null, death: true };
       }
@@ -43,7 +47,7 @@
       const busy = lines.filter(l => l.major).length;
       LG.Events.flavorLines(p, busy, !!yr.event).forEach(f => lines.push(f));
       p.pending = yr.event ? yr.event.id : null;
-      lines.forEach(l => { l.t = LG.U.fixJosa(l.t); });
+      lines.forEach(fx);   // 사망한 해에도, 자동 사건 카드에도 조사 교정이 적용되도록 push 단계에서 이미 처리하고 여기서 한 번 더
       return { lines, event: yr.event, death: false };
     },
 

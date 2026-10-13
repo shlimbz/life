@@ -55,17 +55,20 @@
   function record(dex, p, e) {
     dex = dex || empty();
     const fresh = [];
-    const bump = (obj, k, label) => { if (!k) return; if (!obj[k]) fresh.push(label + k); obj[k] = (obj[k] || 0) + 1; };
+    // 저장은 키(k)로, 화면에 보여 줄 '새로 추가' 목록은 사람이 읽는 이름(shown)으로
+    const bump = (obj, k, shown) => { if (!k) return; if (!obj[k]) fresh.push(shown || k); obj[k] = (obj[k] || 0) + 1; };
     dex.lives = (dex.lives || 0) + 1;
-    bump(dex.titles, e.title, '칭호 · ');
-    bump(dex.liners, e.oneLiner, '한 줄 · ');
-    bump(dex.jobs, e.job, '직업 · ');
-    ACH.forEach(a => { try { if (a.test(p, e)) bump(dex.ach, a.k, a.icon + ' '); } catch (err) { /* 무시 */ } });
+    bump(dex.titles, e.title);
+    bump(dex.liners, e.oneLiner);
+    bump(dex.jobs, e.job);
+    ACH.forEach(a => { try { if (a.test(p, e)) bump(dex.ach, a.k, a.icon + ' ' + a.name); } catch (err) { /* 무시 */ } });
+    // 오늘의 인생: 결과가 시드로 정해져 있어 몇 번이고 다시 하면 '정답'을 외울 수 있다 → 공식 기록은 첫 도전만, 이후는 연습 기록
     if (p.daily) {
       const cur = dex.daily[p.daily];
-      if (!cur || e.total > cur.total) dex.daily[p.daily] = { total: e.total, title: e.title, name: p.name, age: p.age };
+      if (!cur) dex.daily[p.daily] = { total: e.total, title: e.title, name: p.name, age: p.age, tries: 1 };
+      else { cur.tries = (cur.tries || 1) + 1; if (!cur.best || e.total > cur.best) cur.best = e.total; }
     }
-    return { dex, fresh: fresh.map(x => x.replace(/^(칭호|한 줄|직업) · /, '')).slice(0, 6) };
+    return { dex, fresh: fresh.slice(0, 6) };
   }
 
   // 도감 전체 목록 (모아야 할 것들)
