@@ -33,7 +33,7 @@
         out: { success: { t: '밤새 메뉴를 바꾸고 배달 앱에 올렸다. 오히려 단골이 전국으로 늘었다.', log: '코로나 위기를 온라인 전환으로 넘김', achv: 4, hp: 10, fn: H.mulJob(1.15) },
           partial: { t: '수수료를 빼면 남는 게 별로 없지만, 문은 닫지 않았다.', sr: 10 },
           fail: { t: '경쟁이 너무 치열했다. 광고비만 날렸다.', money: -800, sr: 14, hp: -6 } } },
-      { id: 'loan', label: '소상공인 대출로 버틴다', intent: 'stability', out: { t: '정책 대출로 한 해를 버텼다. 끝나면 갚아야 할 빚이다.', debt: 2000, money: 2000, sr: 10 } },
+      { id: 'loan', label: '소상공인 대출로 버틴다', intent: 'stability', out: { t: '정책 대출로 한 해를 버텼다. 끝나면 갚아야 할 빚이다.', debt: 2000, debtKind: 'biz', money: 2000, sr: 10 } },
       { id: 'close', label: '눈물을 머금고 폐업한다', intent: 'money', out: { t: '셔터를 내리던 날, 간판 불을 마지막으로 켜 봤다.', log: '코로나로 폐업', major: true, flag: 'closed_business', quit: true, hp: -14, sr: 8 } }
     ]
   });

@@ -110,7 +110,7 @@
         out: { t: '보상금을 받아 조용한 동네로 옮겼다. 이웃들과는 뿔뿔이 흩어졌다.', log: '재개발 보상을 받고 이사', rel: { friends: -6 }, hp: 2, fn: p => { const v = Math.round(p.house.value * 1.15); p.money += v; p.house = null; p.home = 'rent'; return `${LG.U.money(v)}원을 손에 쥐었다.`; } } },
       { id: 'stay', label: '분담금을 내고 새 아파트에 들어간다', intent: 'stability', if: p => !!p.house,
         check: { base: 50, partial: 0.4, f: [['assets', 0.4], ['ageOver', 75, 1.5]] },
-        out: { success: { t: '공사 기간을 버티고 새 아파트에 입주했다. 이 나이에 새집이라니.', log: '재개발 새 아파트 입주', hp: 10, fn: p => { p.house.value = Math.round(p.house.value * 1.5); p.debt += Math.round(p.house.value * 0.12); return ''; } },
+        out: { success: { t: '공사 기간을 버티고 새 아파트에 입주했다. 이 나이에 새집이라니.', log: '재개발 새 아파트 입주', hp: 10, fn: p => { p.house.value = Math.round(p.house.value * 1.5); LG.Loans.add(p, 'mortgage', Math.round(p.house.value * 0.12)); return ''; } },
           fail: { t: '분담금이 감당되지 않았다. 결국 입주권을 팔았다.', hp: -8, sr: 12, fn: p => { p.money += Math.round(p.house.value * 1.05); p.house = null; p.home = 'rent'; return ''; } } } },
       { id: 'move', label: '세입자로서 조용히 이사한다', intent: 'stability', if: p => !p.house,
         out: { t: '이삿짐을 싸며 30년 동네와 작별했다. 새 동네는 낯설다.', money: -300, hp: -6, rel: { friends: -4 } } },
@@ -142,8 +142,8 @@
     choices: [
       { id: 'go', label: '입학 원서를 낸다', intent: 'education',
         check: { base: 50, partial: 0.4, f: [['stat', 'intelligence', 0.25], ['health', 0.25], ['stat', 'mental', 0.2]] },
-        out: { success: { t: '손주뻘 동기들과 조별 과제를 했다. 4년 뒤 학사모를 썼다.', log: '늦깎이 졸업', major: true, achv: 6, exp: 6, hp: 14, st: { intelligence: 2 } },
-          partial: { t: '졸업은 못 했지만 배운 것이 많다.', exp: 4, hp: 6 }, fail: { t: '눈이 침침해 책 읽기가 힘들었다. 한 학기 만에 그만뒀다.', hp: -3 } } },
+        out: { success: { t: '손주뻘 동기들과 조별 과제를 했다. 4년 뒤 학사모를 썼다.', log: '늦깎이 졸업', major: true, achv: 6, exp: 6, hp: 14, st: { intelligence: 2 }, flag: 'lifelong_learner' },
+          partial: { t: '졸업은 못 했지만 배운 것이 많다.', exp: 4, hp: 6, flag: 'lifelong_learner' }, fail: { t: '눈이 침침해 책 읽기가 힘들었다. 한 학기 만에 그만뒀다.', hp: -3 } } },
       { id: 'phone', label: '스마트폰·키오스크부터 제대로 배운다', intent: 'education', out: { t: '키오스크 앞에서 쩔쩔매던 내가 이제는 친구들에게 가르쳐 준다.', hp: 6, st: { intelligence: 1 }, rel: { friends: 3 } } },
       { id: 'no', label: '이제 와서 무슨 공부냐', intent: 'rest', out: { t: '마음만 먹고 접었다.', hp: -1 } }
     ]

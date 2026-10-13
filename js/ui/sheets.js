@@ -22,7 +22,7 @@
     clearTimeout(st.timer);
     st.sheetOpen = true;
     const body = $('#sheet-body');
-    body.innerHTML = tab === 'dex' ? dexHTML() : tab === 'settings' ? `<h2 class="sh-title">설정${closeBtn}</h2>` + settingsBlock() : tab === 'people' ? peopleHTML() : tab === 'asset' ? assetHTML() : tab === 'style' ? styleHTML() : tab === 'menu' ? menuHTML() : logHTML('key');
+    body.innerHTML = tab === 'stats' ? statsHTML() : tab === 'dex' ? dexHTML() : tab === 'settings' ? `<h2 class="sh-title">설정${closeBtn}</h2>` + settingsBlock() : tab === 'people' ? peopleHTML() : tab === 'asset' ? assetHTML() : tab === 'style' ? styleHTML() : tab === 'menu' ? menuHTML() : logHTML('key');
     if (tab === 'settings') bindSettings();
     if (tab === 'dex') bindDex();
     body.scrollTop = 0;
@@ -85,7 +85,7 @@
     const I = LG.Invest, m = p.mkt, nw = S.netWorth(p);
     const rows = I.allocation(p);
     const tot = rows.reduce((a, r) => a + r.v, 0) || 1;
-    const colors = { cash: '#c9c3d6', deposit: '#7fd6c2', stock: '#7fb2ff', crypto: '#ffb36b', house: '#d89cf0' };
+    const colors = { cash: '#c9c3d6', deposit: '#7fd6c2', stock: '#7fb2ff', crypto: '#ffb36b', reit: '#f2d36b', house: '#d89cf0', prop: '#b98be0' };
     const pol = p.invPolicy || 'cash';
     const canInvest = p.age >= 19;
     const hist = (m && m.hist) ? m.hist.slice(-10) : [];
@@ -95,9 +95,12 @@
       <div class="card as-sum">
         <div class="as-nw"><span>순자산</span><b>${U.money(nw)}원</b></div>
         <div class="as-stack">${rows.filter(r => r.v > 0).map(r => `<i style="flex:${r.v};background:${colors[r.k]}" title="${r.name}"></i>`).join('') || '<i style="flex:1;background:#555"></i>'}</div>
-        <div class="as-legend">${rows.map(r => `<div><i style="background:${colors[r.k]}"></i><span>${r.icon} ${r.name}</span><b>${U.money(r.v)}</b><small>${Math.round(r.v / tot * 100)}%</small></div>`).join('')}
+        <div class="as-legend">${rows.filter(r => r.v > 0 || ['cash', 'deposit', 'stock'].indexOf(r.k) >= 0).map(r => `<div><i style="background:${colors[r.k]}"></i><span>${r.icon} ${r.name}</span><b>${U.money(r.v)}</b><small>${Math.round(r.v / tot * 100)}%</small></div>`).join('')}
           ${p.debt > 0 ? `<div class="debt"><i style="background:#ef6b6b"></i><span>🧾 빚</span><b>-${U.money(p.debt)}</b><small></small></div>` : ''}</div>
       </div>
+      ${(() => { const L = LG.Loans.list(p); if (!L.length) return ''; const yr = L.reduce((a, l) => a + Math.round(l.amt * l.rate), 0);
+        return `<h3 class="sh-sec">빚 (대출 종류별)</h3><div class="card loans">${L.map(l => `<div class="row${l.regular ? '' : ' bad'}"><span>${l.icon} ${esc(l.name)}${l.late ? ` <em class="late">연체 ${l.late}년</em>` : ''}</span><b>${U.money(l.amt)}원</b><small>연 ${(l.rate * 100).toFixed(1)}%${l.k === 'deposit' ? ' · 집을 팔 때 돌려줌' : ` · ${l.left}년 남음`}</small></div>`).join('')}
+          <p class="as-note" style="margin:6px 0 0">해마다 이자 약 ${U.money(yr)}원. 정해진 원금을 갚고, 남는 돈으로 <b>금리가 높은 빚부터</b> 먼저 갚습니다. 카드론·대부업은 연체되면 바로 독촉이 옵니다.</p></div>`; })()}
       <h3 class="sh-sec">돈을 굴리는 방식</h3>
       ${canInvest ? '' : '<p class="empty">아직은 돈을 굴릴 나이가 아니다.</p>'}
       <div class="pol-list ${canInvest ? '' : 'off'}">${Object.keys(I.POLICY).map(k => { const o = I.POLICY[k]; return `<button class="pol ${pol === k && p.invPolicy ? 'on' : ''}" data-pol="${k}" type="button"><span class="pi">${o.icon}</span><span class="pt"><b>${o.name}</b><small>${o.desc}</small></span></button>`; }).join('')}</div>
@@ -106,6 +109,9 @@
       <div class="card">
         ${m ? `<div class="row"><span>증시</span><b>${I.REGIME_NAME[m.regime]} · 지난해 ${m.stockRet >= 0 ? '+' : ''}${Math.round(m.stockRet * 100)}%</b></div>
         <div class="row"><span>코인</span><b>${I.CRYPTO_NAME[m.crypto]} · 지난해 ${m.cryptoRet >= 0 ? '+' : ''}${Math.round(m.cryptoRet * 100)}%</b></div>
+        <div class="row"><span>부동산</span><b>${I.RE_NAME[m.re || 'normal']} · 지난해 우리 지역 ${p.reLast ? (p.reLast.ret >= 0 ? '+' : '') + p.reLast.ret + '%' : '-'}</b></div>
+        ${p.house ? `<div class="row"><span>🏠 내 집</span><b>${U.money(p.house.value)}원${p.house.bought ? ` <small>(산 값 ${U.money(p.house.bought)})</small>` : ''}</b></div>` : ''}
+        ${p.prop ? `<div class="row"><span>🏘️ ${esc(p.prop.label)}</span><b>${U.money(p.prop.value)}원 <small>(산 값 ${U.money(p.prop.bought)})</small></b></div>` : ''}
         <div class="row"><span>예금 금리</span><b>연 ${(m.rate * 100).toFixed(1)}%</b></div>
         <div class="mini-hist">${hist.map(h => `<div title="${h.y}년 ${h.s}%"><i class="${h.s >= 0 ? 'up' : 'dn'}" style="height:${Math.max(4, Math.abs(h.s) / maxAbs * 100)}%"></i></div>`).join('')}</div><p class="as-note" style="margin-top:4px">최근 증시 연간 수익률</p>` : '<p class="empty">아직 시장 기록이 없다.</p>'}
         ${last && last.before > 0 ? `<div class="row"><span>지난해 투자 손익</span><b class="${last.pl >= 0 ? 'gain' : 'loss'}">${last.pl >= 0 ? '+' : ''}${U.money(last.pl)}원</b></div>` : ''}
@@ -219,6 +225,24 @@
     if (pc) pc.onchange = () => { LG.Storage.setPref('confirm', pc.checked); toast(pc.checked ? '중요한 선택은 한 번 더 확인합니다' : '확인 없이 바로 선택합니다'); };
   }
 
+  // ───── 능력치 설명: 비슷해 보이는 것들의 차이 ─────
+  const STAT_HELP = [
+    ['건강', p => p.stats.health, '몸 상태. 낮으면 병에 걸리기 쉽고 오래 살기 어렵다. 운동 습관·건강형 삶·의료 환경이 올리고, 나이·흡연·과로·큰 병이 내린다.'],
+    ['행복', p => p.happy, '삶 전체에 대한 만족. 관계·성취·여유가 쌓아 올리는 느린 수치. 엔딩 점수에서 가장 비중이 크다.'],
+    ['스트레스', p => p.stress, '지금 받고 있는 압박(일·빚·갈등·시험). 행복과 따로 움직인다 — 성공한 직장인은 행복하면서도 스트레스가 높을 수 있다. 오래 높으면 건강과 심혈관 질환 위험이 나빠진다.'],
+    ['학습', p => p.stats.intelligence, '배우고 이해하는 능력. 공부·진학·전문직·투자 판단에 쓰인다.'],
+    ['운동', p => p.stats.physical, '체력과 운동 능력. 운동 진로뿐 아니라 연애(매력)·사고 회복·질병 예방에도 영향을 준다.'],
+    ['사교', p => p.stats.social, '사람을 사귀고 설득하는 "능력". 처음 만나는 사람, 면접, 영업, 연애 고백에 쓰인다.'],
+    ['창의', p => p.stats.creativity, '새로운 것을 떠올리는 힘. 예술·창업·방송 같은 길에서 중요하다.'],
+    ['멘탈', p => p.stats.mental, '정신력·회복탄력성. 실패와 위기에서 버티는 힘, 중독·번아웃을 이겨 내는 힘.'],
+    ['관계', p => S.relScore(p), '지금 곁에 있는 사람들(가족·연인·친구)과 실제로 얼마나 가까운지의 평균. 사교가 "능력"이라면 관계는 "결과"다. 챙기지 않으면 사교성이 높아도 떨어진다.']
+  ];
+  function statsHTML() {
+    const p = K.p;
+    return `<h2 class="sh-title">능력치 설명${closeBtn}</h2>` + STAT_HELP.map(([n, f, d]) => `<div class="card"><div class="row"><span>${n}</span><b>${Math.round(f(p))}</b></div><p class="as-note" style="margin:4px 0 0">${d}</p></div>`).join('') +
+      `<p class="as-note">선택지의 성공 확률은 이벤트가 정한 조건에 더해, 지금의 능력치·건강·재산이 의도에 맞게 함께 작용합니다. (예: 연애는 사교·매력·건강·경제력, 창업은 배짱·판단력·자본·인맥)</p>`;
+  }
+
   // ───── 인생 도감 ─────
   function dexHTML(tab) {
     tab = tab || 'title';
@@ -247,7 +271,7 @@
     const items = p.history.filter(x => mode === 'all' || x.k !== 'minor');
     return `<h2 class="sh-title">인생 기록${closeBtn}</h2>
       <div class="seg"><button data-mode="key" class="${mode === 'key' ? 'on' : ''}" type="button">주요 사건</button><button data-mode="all" class="${mode === 'all' ? 'on' : ''}" type="button">전체</button></div>
-      <div id="log-list">${items.slice().reverse().map(x => `<div class="log-item k-${x.k}"><b>${x.a}세</b><span>${esc(x.i ? x.i + ' ' : '')}${esc(x.t)}</span></div>`).join('')}</div>`;
+      <div id="log-list">${items.slice().reverse().map(x => `<div class="log-item k-${x.k}"><b>${x.a}세</b><span>${esc(x.i ? x.i + ' ' : '')}${esc(x.t)}${x.fx ? ` <em class="fx">${esc(x.fx)}</em>` : ''}</span></div>`).join('')}</div>`;
   }
   function bindLogSeg() {
     $$('#sheet-body .seg button').forEach(b => b.addEventListener('click', () => {
@@ -255,5 +279,5 @@
     }));
   }
 
-  Object.assign(K, { settingsBlock, bindSettings, dexHTML, bindDex, openSheet, closeSheet, personCard, relWord, peopleHTML, assetHTML, bindAsset, fxChips, styleHTML, bindStyle, menuHTML, bindMenu, logHTML, bindLogSeg, AVATAR, closeBtn });
+  Object.assign(K, { statsHTML, settingsBlock, bindSettings, dexHTML, bindDex, openSheet, closeSheet, personCard, relWord, peopleHTML, assetHTML, bindAsset, fxChips, styleHTML, bindStyle, menuHTML, bindMenu, logHTML, bindLogSeg, AVATAR, closeBtn });
 })(window.LG = window.LG || {});

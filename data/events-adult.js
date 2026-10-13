@@ -6,9 +6,10 @@
   const jobIn = H.jobIn;
   const CREATIVE = ['artist', 'musician', 'writer', 'creator', 'freelancer', 'designer'];
 
-  H.housePrice = p => Math.round(S().liveRegion(p).rent * 70 * ((!p.urban && !p.liveIn) ? 0.6 : 1) / 100) * 100;
+  // 집값 = 지역 기준 시세 × 부동산 시장 지수(상승기엔 비싸지고 침체기엔 싸진다)
+  H.housePrice = p => Math.round(S().liveRegion(p).rent * 70 * ((!p.urban && !p.liveIn) ? 0.6 : 1) * ((p.mkt && p.mkt.reIdx) || 1) / 100) * 100;
   H.buyHouse = (scale, label) => p => {
-    const price = Math.round(H.housePrice(p) * scale / 100) * 100;
+    let price = Math.round(H.housePrice(p) * scale / 100) * 100;
     const want = Math.round(price * 0.5);
     // 집안의 도움: 부유한 집은 목돈을 보태 주고, 어려운 집은 기대기 어렵다 (한 번만)
     let help = 0;
@@ -20,8 +21,12 @@
     }
     if (p.money < want && LG.Invest) LG.Invest.raise(p, want - p.money);
     const down = Math.min(Math.max(0, p.money), want);
-    p.money -= down; p.debt += price - down;
-    p.house = { value: price, label: label || S().liveRegion(p).short + ' ' + (p.urban || p.liveIn ? '아파트' : '주택') };
+    // 대출 한도(DSR): 원리금이 연 소득의 40%를 넘지 않게 → 한도를 넘으면 그만큼 작은 집을 산다
+    const maxLoan = Math.round(Math.max(3000, (p.lastIncome || LG.Economy.salary(p)) * 5.3) / 100) * 100;
+    let smaller = false;
+    if (price - down > maxLoan) { price = down + maxLoan; smaller = true; }
+    p.money -= down; LG.Loans.add(p, 'mortgage', price - down);
+    p.house = { value: price, bought: price, at: p.age, label: (smaller ? '(대출 한도에 맞춘) ' : '') + (label || S().liveRegion(p).short + ' ' + (p.urban || p.liveIn ? '아파트' : '주택')) };
     p.home = 'own'; S().flag(p, 'home_owner');
     return `(${LG.U.money(price)}원, 대출 ${LG.U.money(price - down)}원${help ? ', 부모님 지원 ' + LG.U.money(help) + '원' : ''})`;
   };
@@ -354,7 +359,7 @@
           partial: { t: '반지하 방밖에 구하지 못했다. 그래도 내 방이다.', log: '독립 (반지하)', home: 'rent', hp: 3, st: { health: -2 } },
           fail: { t: '보증금이 모자랐다. 조금 더 모아야 한다.', sr: 5 }
         } },
-      { id: 'stay', label: '돈을 모으며 부모님과 산다', intent: 'money', out: { t: '눈치는 보이지만 통장은 든든해진다.', flag: 'saved_early', rel: { parents: 3 }, hp: -2 } }
+      { id: 'stay', label: '돈을 모으며 부모님과 산다', intent: 'money', out: { t: '눈치는 보이지만 통장은 든든해진다.', flag: 'saved_early', rel: { parents: 3 }, hp: 0 } }
     ]
   });
 
@@ -386,7 +391,7 @@
       { id: 'serious', label: '결혼을 생각하며 진지하게 만난다', intent: 'family', if: p => p.age >= 25,
         check: { base: 42, partial: 0.4, f: [['stat', 'social', 0.25], ['stat', 'mental', 0.15], ['fn', p => p.job ? { label: '안정된 벌이', v: (LG.DATA.jobs[p.job.id].stab - 50) * 0.15 } : { label: '불안정한 벌이', v: -8 }], ['ageOver', 40, 1]] },
         out: {
-          success: { t: '서로의 가족 이야기, 미래 이야기를 일찍부터 나눴다. {partner}와(과) 진지하게 만나기 시작했다.', log: '{partner}와 결혼을 전제로 연애 시작', hp: 12, fn: p => { LG.Rel.makeLoveInterest(p); S().flag(p, 'dating'); const pt = H.rel(p, 'partner'); if (pt) pt.since = p.age - 1; return ''; } },
+          success: { t: '서로의 가족 이야기, 미래 이야기를 일찍부터 나눴다. {partner}와(과) 진지하게 만나기 시작했다.', log: '{partner}와 결혼을 전제로 연애 시작', hp: 12, fn: H.lover() },
           partial: { t: '좋은 사람이지만 원하는 속도가 달랐다. 연락은 이어 가기로 했다.', queue: [{ id: 'r_some', in: 1 }], hp: 1 },
           fail: { t: '"너무 무겁게 느껴져요." 첫 만남에서 미래 얘기는 이른 모양이다.', hp: -6 }
         } },
@@ -412,28 +417,76 @@
 
   // 결혼: 양가 지원(형편에 따라) → 결혼식·신혼집 결정은 이어지는 'ex_wedding' 에서
   H.wed = p => {
+    const pt = H.partnerInfo ? H.partnerInfo(p, H.rel(p, 'partner')) : null;
     LG.Rel.marry(p); if (p.age < 28) S().flag(p, 'married_young'); if (p.home === 'parents') p.home = 'rent';
     p.queue.unshift({ id: 'ex_wedding', at: p.age, chain: true });
-    const g = Math.round({ 1: 0, 2: 100, 3: 400, 4: 1500, 5: 4000 }[p.family.tier] * LG.Birth.giftMul(p) * LG.U.clamp(S().supportScore(p) / 60, 0.5, 1.2) / 50) * 50;
-    if (g > 0) { p.money += g; return `양가 부모님이 ${LG.U.money(g)}원을 보태 주셨다.`; }
-    return '';
+    const SUP = { 1: 0, 2: 100, 3: 400, 4: 1500, 5: 4000 };
+    const g = Math.round(SUP[p.family.tier] * LG.Birth.giftMul(p) * LG.U.clamp(S().supportScore(p) / 60, 0.5, 1.2) / 50) * 50;
+    const g2 = pt ? Math.round(SUP[pt.fam] * 0.6 / 50) * 50 : 0;
+    const sv = pt ? pt.saved || 0 : 0;
+    const out = [];
+    if (sv > 0) { p.money += sv; pt.saved = 0; out.push(`${pt.name.slice(1)}이(가) 모아 온 ${LG.U.money(sv)}원과 살림을 합쳤다.`); }
+    if (g + g2 > 0) { p.money += g + g2; out.push(`양가 부모님이 ${LG.U.money(g + g2)}원을 보태 주셨다.`); }
+    return out.join(' ');
   };
   // 누가 먼저 청혼할까: 한국에서는 남자가 먼저 하는 경우가 많지만, 여자가 먼저 하기도 한다.
   // 상대마다 한 번 정해 두고, 대답을 미루면 다음엔 반대편 차례가 된다.
   H.whoProposes = p => {
     const pt = H.rel(p, 'partner'); if (!pt) return null;
-    if (!pt.proposer) pt.proposer = LG.RNG.chance(p, (p.gender === 'F' ? 0.72 : 0.22) + (pt.rel >= 80 ? 0.08 : 0)) ? 'them' : 'me';
+    if (!pt.proposer) pt.proposer = LG.RNG.chance(p, p.gender === 'F' ? 0.9 : 0.1) ? 'them' : 'me';   // 한국에서는 대개 남자가 청혼한다
     return pt.proposer;
+  };
+
+  // 결혼 상대의 현실 조건 — 청혼 카드에 함께 보여 준다 (나이 · 직업 · 벌이 · 모은 돈 · 집안 · 성격 · 만난 기간 · 걸리는 점)
+  const FAM = { 1: '어려움', 2: '빠듯함', 3: '보통', 4: '여유 있음', 5: '부유함' };
+  H.partnerInfo = (p, pt) => {
+    if (!pt) return null;
+    const R = LG.RNG;
+    if (pt.fam == null) pt.fam = +R.weightedKey(p, { 1: 8, 2: 24, 3: 42, 4: 20, 5: 6 });
+    if (pt.saved == null) pt.saved = Math.max(0, Math.round((pt.income || 0) * Math.max(0, pt.age - 24) * R.float(p, 0.08, 0.3) / 100) * 100);
+    return pt;
+  };
+  H.partnerFacts = p => {
+    const pt = H.partnerInfo(p, H.rel(p, 'partner'));
+    if (!pt) return null;
+    const J = pt.job ? LG.DATA.jobs[pt.job] : null, M = LG.U.money;
+    const yrs = Math.max(1, p.age - pt.since), gap = pt.age - p.age;
+    const mine = S().netWorth(p), both = mine + pt.saved, home = Math.round(H.housePrice(p) * 0.55 / 100) * 100;
+    const worry = [];
+    if (!J) worry.push('상대의 일자리가 아직 불안정하다');
+    else if (J.stab < 45) worry.push('상대의 벌이가 들쭉날쭉하다');
+    if (pt.fam <= 1) worry.push('상대 부모님의 노후 준비가 안 되어 있다');
+    if (Math.abs(gap) >= 6) worry.push(`나이 차이가 ${Math.abs(gap)}살이다`);
+    if (both < home * 0.3) worry.push('둘이 모은 돈으로는 신혼집 마련이 빠듯하다');
+    if (pt.rel < 60) worry.push('요즘 사이가 예전 같지 않다');
+    if (p.flags.parents_divorced) worry.push('부모님의 이혼이 마음에 걸린다');
+    const good = [];
+    if (pt.rel >= 78) good.push('서로를 깊이 믿는다');
+    if (pt.fam >= 4) good.push('양가 지원을 기대할 수 있다');
+    if (J && J.stab >= 80) good.push('상대의 직장이 안정적이다');
+    return [
+      { k: '상대', v: `${pt.name} · ${pt.age}세${gap ? ` (${gap > 0 ? gap + '살 연상' : -gap + '살 연하'})` : ' (동갑)'}` , tone: 'wide' },
+      { k: '직업', v: J ? J.name : '구직 중' },
+      { k: '연봉', v: pt.income ? `약 ${M(pt.income)}원` : '없음' },
+      { k: '모은 돈', v: `약 ${M(pt.saved)}원` },
+      { k: '본가 형편', v: FAM[pt.fam] },
+      { k: '성격', v: pt.personality },
+      { k: '만난 지', v: `${yrs}년 · 사이 ${Math.round(pt.rel)}점` },
+      { k: '신혼집', v: `전세 약 ${M(home)}원 / 둘이 모은 돈 약 ${M(Math.max(0, both))}원`, tone: 'wide' + (both >= home ? ' good' : both < home * 0.3 ? ' bad' : '') },
+      good.length ? { k: '좋은 점', v: good.join(' · '), tone: 'wide good' } : null,
+      worry.length ? { k: '걸리는 점', v: worry.join(' · '), tone: 'wide bad' } : null
+    ].filter(Boolean);
   };
 
   E.push({
     id: 'r_propose', cat: 'marriage', tier: 'major', ages: [24, 60], cd: 3, milestone: true, prio: 2, icon: '💍',
+    facts: p => H.partnerFacts(p),
     w: p => { const pt = H.rel(p, 'partner'); return pt ? (10 + (p.age - pt.since) * 6 + (p.age >= 30 ? 6 : 0)) * ((pt.waits || 0) >= 1 ? 0.35 : 1) : 0; },
     if: p => { const pt = H.rel(p, 'partner'); return !!pt && p.age - pt.since >= 2 && H.whoProposes(p) === 'me'; },
     label: '결혼', title: '함께하는 미래',
-    text: '{partner}와(과) 만난 지 꽤 되었다. 함께하는 미래를 그려 본다.',
+    text: p => { const pt = H.rel(p, 'partner'); return `{partner}와(과) 만난 지 ${Math.max(1, p.age - pt.since)}년이 되었다. 함께하는 미래를 그려 본다. 결혼은 마음만으로 하는 게 아니라는 걸 안다.`; },
     choices: [
-      { id: 'propose', label: '프러포즈한다', intent: 'love',
+      { id: 'propose', label: p => p.gender === 'F' ? '먼저 결혼하자고 말한다' : '프러포즈한다', intent: 'love',
         check: { base: 40, partial: 0.5, f: [['rel', 'partner', 0.6], ['assets', 0.45], ['fn', p => LG.DATA.lift ? { label: '가정을 꾸리려는 마음', v: Math.min(12, Math.max(0, (LG.DATA.lift(p, 'family') + LG.DATA.lift(p, 'love') - 2) * 8)) } : null], ['fn', p => p.job ? { label: '직업 안정성', v: (LG.DATA.jobs[p.job.id].stab - 50) * 0.15 } : { label: '불안정한 벌이', v: -12 }], ['ageOver', 42, 0.6]] },
         out: {
           success: { t: '"응." {spouse}와(과) 결혼하기로 했다!', log: '{spouse}와 결혼', hp: 16, achv: 2, rel: { parents: 4 }, fn: p => H.wed(p) },
@@ -441,7 +494,7 @@
           fail: { t: '"우린 원하는 미래가 달라." 결국 헤어졌다.', log: '프러포즈 거절, 이별', hp: -14, fn: p => { LG.Rel.breakup(p); return ''; } }
         } },
       { id: 'wait', label: '아직은 연애만 한다', intent: 'independence',
-        out: { t: '', fn: p => { const pt = H.rel(p, 'partner'); pt.waits = (pt.waits || 0) + 1;
+        out: { t: '', fn: p => { const pt = H.rel(p, 'partner'); pt.waits = (pt.waits || 0) + 1; if (p.gender === 'F') pt.proposer = 'them';
           if (pt.waits >= 2) { const nm = pt.name.slice(1); LG.Rel.breakup(p); S().addStat(p, 'happy', -10); return `"나는 언제까지 기다려야 해?" 기다리다 지친 ${nm}이(가) 먼저 이별을 말했다.`; }
           LG.Rel.adjust(p, 'partner', 2); return '지금이 좋다. 서두르지 않기로 했다. (상대는 조금 서운한 눈치다)'; } } },
       { id: 'end', label: '헤어진다', intent: 'independence', out: { t: '서로를 위해 각자의 길을 가기로 했다.', log: '{partner}와 이별', hp: -8, fn: p => { LG.Rel.breakup(p); return ''; } } }
@@ -450,6 +503,7 @@
 
   E.push({
     id: 'r_proposed', cat: 'marriage', tier: 'major', ages: [23, 62], cd: 3, milestone: true, prio: 2, icon: '💍',
+    facts: p => H.partnerFacts(p),
     if: p => { const pt = H.rel(p, 'partner'); return !!pt && p.age - pt.since >= 2 && H.whoProposes(p) === 'them'; },
     label: '결혼', title: '청혼을 받았다',
     text: p => { const pt = H.rel(p, 'partner'); return pt.rel >= 75 ? `{partner}이(가) 저녁 식사 자리에서 작은 상자를 내밀었다. "나랑 결혼해 줄래?" 손이 떨리고 있었다.` : `{partner}이(가) 조심스럽게 말했다. "우리 이제 결혼 이야기를 해 보는 건 어때?" 마음이 복잡해졌다.`; },
@@ -457,9 +511,9 @@
       { id: 'yes', label: '"응, 좋아." 승낙한다', intent: 'love',
         out: { t: '눈물이 먼저 났다. {spouse}이(가) 나를 꼭 안았다.', log: '{spouse}의 청혼을 받아 결혼', hp: 18, achv: 2, rel: { parents: 4 }, fn: p => H.wed(p) } },
       { id: 'later', label: '"조금만 더 생각해 볼게"', intent: 'independence',
-        out: { t: '', fn: p => { const pt = H.rel(p, 'partner'); pt.waits = (pt.waits || 0) + 1; pt.proposer = 'me';
+        out: { t: '', fn: p => { const pt = H.rel(p, 'partner'); pt.waits = (pt.waits || 0) + 1; pt.proposer = p.gender === 'F' ? 'them' : 'me';
           if (pt.waits >= 2) { const nm = pt.name.slice(1); LG.Rel.breakup(p); S().addStat(p, 'happy', -10); return `"나는 계속 기다리기만 했어." ${nm}이(가) 끝내 이별을 말했다.`; }
-          LG.Rel.adjust(p, 'partner', -6); return '상대의 얼굴에 서운함이 스쳤다. 이번엔 내가 대답할 차례가 올 것이다.'; } } },
+          LG.Rel.adjust(p, 'partner', -6); return p.gender === 'F' ? '상대의 얼굴에 서운함이 스쳤다. "기다릴게." 그 말이 고맙고도 무거웠다.' : '상대의 얼굴에 서운함이 스쳤다. 이번엔 내가 대답할 차례가 올 것이다.'; } } },
       { id: 'no', label: '거절하고 헤어진다', intent: 'independence', out: { t: '"미안해. 우린 원하는 미래가 달라." 오래 운 밤이었다.', log: '청혼을 거절하고 이별', hp: -10, fn: p => { LG.Rel.breakup(p); return ''; } } }
     ]
   });
@@ -530,7 +584,33 @@
 
   // ───────────────────────── 자녀 ─────────────────────────
 
-  const nth = n => ['첫째', '둘째', '셋째'][n] || '또 한 명';
+  const nth = n => ['첫째', '둘째', '셋째', '넷째', '다섯째'][n] || '또 한 명';
+  // 임신 → 이듬해 출산. 아이는 '갖기로 한 선택'이나 '뜻밖의 임신에 대한 선택'을 거쳐야만 태어나고,
+  // 태어날 때는 카드로 "몇째가 태어났는지"를 분명히 보여 준다.
+  const conceive = (p, kind) => {
+    p.flags.pregnant = { at: p.age, kind: kind || 'plan', n: H.kids(p).length };
+    p.flags.lastBirth = p.age;   // 임신 중에는 다른 임신 이벤트가 겹치지 않게
+    p.queue.push({ id: 'k_birth', at: p.age + 1 });
+    return nth(H.kids(p).length);
+  };
+  H.conceive = conceive;
+  H.pregnant = p => !!p.flags.pregnant;
+  E.push({
+    id: 'k_birth', cat: 'child', tier: 'auto', ages: [16, 60], queued: true, icon: '👶', card: true,
+    if: p => !!p.flags.pregnant,
+    title: '새 식구',
+    auto: {
+      major: true, card: true, hp: 12, sr: 5, achv: 2, money: -150, rel: { spouse: 4 },
+      log: p => `${nth(H.kids(p).length - 1)} ${H.kids(p)[H.kids(p).length - 1].name.slice(1)} 출생`,
+      fn: p => {
+        const preg = p.flags.pregnant; delete p.flags.pregnant;
+        const n = H.kids(p).length;
+        const c = LG.Rel.haveChild(p); p.flags.lastBirth = p.age;
+        const tail = preg && preg.kind === 'surprise' ? ' 계획에 없던 아이였지만, 얼굴을 보는 순간 그런 건 아무래도 좋아졌다.' : ' 작은 손이 내 손가락을 꼭 잡았다.';
+        return `${nth(n)} ${c.name.slice(1)}이(가) 태어났다.${tail} (출산 비용이 들고, 한동안 밤잠을 설치느라 스트레스가 조금 오른다.)`;
+      }
+    }
+  });
   E.push({
     id: 'k_child', cat: 'child', tier: 'major', ages: [23, 44], cd: 3, milestone: true, prio: 2, icon: '👶',
     // 형편이 넉넉해서가 아니라 '어떤 환경에서 살아왔는가'가 아이 수에 영향을 준다.
@@ -544,7 +624,7 @@
     },
     if: p => {
       const n = H.kids(p).length;
-      if (!H.rel(p, 'spouse') || has(p, 'childfree') || has(p, 'kids_enough') || p.age - H.rel(p, 'spouse').since < 1) return false;
+      if (p.flags.pregnant || !H.rel(p, 'spouse') || has(p, 'childfree') || has(p, 'kids_enough') || p.age - H.rel(p, 'spouse').since < 1) return false;
       if (n >= 5) return false;
       if (n >= 1 && p.age - (p.flags.lastBirth || p.flags.parent) < 2) return false;
       if (n >= 2 && p.age > 41) return false;
@@ -562,7 +642,7 @@
       { id: 'yes', label: p => ['아이를 갖는다', '둘째를 갖는다', '셋째를 갖는다', '넷째를 갖는다'][H.kids(p).length] || '아이를 갖는다', intent: 'family',
         check: { base: 74, partial: 0.5, f: [['ageOver', 34, 2.6], ['health', 0.2], ['rel', 'spouse', 0.15]] },
         out: {
-          success: { t: '', log: p => nth(H.kids(p).length - 1) + ' 출생', hp: 15, sr: 8, achv: 2, rel: { spouse: 5 }, fn: p => { const c = LG.Rel.haveChild(p); p.flags.lastBirth = p.age; return `${c.name.slice(1)}이(가) 태어났다. 작은 손이 내 손가락을 꼭 잡았다.`; } },
+          success: { t: '', log: p => nth(p.flags.pregnant ? p.flags.pregnant.n : H.kids(p).length) + ' 임신', hp: 8, rel: { spouse: 5 }, fn: p => { const k = conceive(p, 'plan'); return `임신 소식을 들었다! {spouse}와(과) 한참을 붙잡고 웃었다. 내년이면 ${k}를 만난다.`; } },
           partial: { t: '아이가 쉽게 찾아오지 않았다. 마음이 지쳐 간다.', sr: 10, hp: -6 },
           fail: { t: '난임 판정을 받았다. 병원을 오가는 날들이 길어진다.', sr: 14, hp: -10, money: -500 }
         } },
@@ -575,17 +655,17 @@
   // 계획에 없던 임신 — 결혼한 사이, 연인 사이 모두 일어날 수 있다 (피임을 했든 안 했든)
   E.push({
     id: 'k_surprise', cat: 'child', tier: 'major', ages: [24, 46], w: p => (H.kids(p).length >= 1 ? 5 : 3.5) + (p.family.tier <= 2 ? 2 : 0) + (S().hasTrait(p, 'impulsive') ? 1.5 : 0), cd: 4, max: 3, icon: '🧪',
-    if: p => !!H.rel(p, 'spouse') && p.age - H.rel(p, 'spouse').since >= 1 && H.kids(p).length < 5 && !(p.age - (p.flags.lastBirth || -9) < 2) && !(has(p, 'childfree') && p.age > 42),
+    if: p => !p.flags.pregnant && !!H.rel(p, 'spouse') && p.age - H.rel(p, 'spouse').since >= 1 && H.kids(p).length < 5 && !(p.age - (p.flags.lastBirth || -9) < 2) && !(has(p, 'childfree') && p.age > 42),
     label: '가족', title: '계획에 없던 임신',
     text: p => (has(p, 'childfree') ? '아이는 갖지 않기로 했었다. 그런데 테스트기에 선명한 두 줄이 떴다.' : has(p, 'kids_enough') ? '아이는 이제 충분하다고 정했었다. 그런데 테스트기에 선명한 두 줄이 떴다.' : H.kids(p).length ? '둘째(혹은 또 한 명) 계획은 아직 없었는데, 테스트기에 선명한 두 줄이 떴다.' : '아직 준비가 안 됐다고 생각했는데, 테스트기에 선명한 두 줄이 떴다.') + ' {spouse}와(과) 한참 말이 없었다.',
     choices: [
       { id: 'keep', label: '축복으로 받아들이고 낳는다', intent: 'family',
-        out: { t: '', log: '뜻밖의 임신, 아이를 맞이함', hp: 6, sr: 12, money: -300, rel: { spouse: 2 }, fn: p => { const c = LG.Rel.haveChild(p); p.flags.lastBirth = p.age; S().unflag(p, 'childfree'); S().unflag(p, 'kids_enough'); return `예정에 없던 ${c.name.slice(1)}이(가) 태어났다. 계획은 틀어졌지만 이 작은 얼굴을 보면 모든 게 괜찮아진다.`; } } },
+        out: { t: '', log: '뜻밖의 임신, 낳기로 함', hp: 4, sr: 6, rel: { spouse: 2 }, fn: p => { S().unflag(p, 'childfree'); S().unflag(p, 'kids_enough'); const k = conceive(p, 'surprise'); return `계획은 틀어졌지만 낳기로 했다. 내년이면 ${k}를 만난다. 마음이 조금씩 설레기 시작했다.`; } } },
       { id: 'talk', label: '밤새 이야기해 보고 결정한다', intent: 'stability',
         check: { base: 60, partial: 0.5, f: [['rel', 'spouse', 0.4], ['assets', 0.2], ['stress', 0.3]] },
         out: {
-          success: { t: '', log: '뜻밖의 임신, 함께 결정함', hp: 4, sr: 6, rel: { spouse: 5 }, fn: p => { const c = LG.Rel.haveChild(p); p.flags.lastBirth = p.age; return `서로의 속마음을 처음 다 꺼내 놓았다. 그리고 함께 아이를 맞이하기로 했다. ${c.name.slice(1)}이(가) 태어났다.`; } },
-          partial: { t: '결정은 쉽지 않았고, 서로에게 서운한 말도 오갔다. 그래도 마지막엔 함께하기로 했다.', log: '뜻밖의 임신으로 부부 갈등', sr: 14, rel: { spouse: -4 }, fn: p => { LG.Rel.haveChild(p); p.flags.lastBirth = p.age; return ''; } },
+          success: { t: '', log: '뜻밖의 임신, 함께 결정함', hp: 4, sr: 3, rel: { spouse: 5 }, fn: p => { S().unflag(p, 'childfree'); S().unflag(p, 'kids_enough'); const k = conceive(p, 'surprise'); return `서로의 속마음을 처음 다 꺼내 놓았다. 그리고 함께 아이를 맞이하기로 했다. 내년이면 ${k}를 만난다.`; } },
+          partial: { t: '결정은 쉽지 않았고, 서로에게 서운한 말도 오갔다. 그래도 마지막엔 낳기로 했다.', log: '뜻밖의 임신으로 부부 갈등', sr: 10, rel: { spouse: -4 }, fn: p => { S().unflag(p, 'childfree'); S().unflag(p, 'kids_enough'); conceive(p, 'surprise'); return ''; } },
           fail: { t: '의견이 좁혀지지 않았다. 임신은 이어가지 못했고, 한동안 서로의 얼굴을 보기가 힘들었다.', log: '임신을 이어가지 못함', hp: -10, sr: 14, rel: { spouse: -8 } }
         } },
       { id: 'stop', label: '현실을 생각해 임신을 이어가지 않기로 한다', intent: 'stability',
@@ -596,7 +676,7 @@
   // 결혼 전 임신 (속도위반)
   E.push({
     id: 'k_premarital', cat: 'child', tier: 'major', ages: [19, 40], w: p => 4 + (p.family.tier <= 2 ? 2 : 0) + (S().hasTrait(p, 'impulsive') ? 2.5 : 0) + (p.age <= 27 ? 2 : 0), cd: 6, max: 1, icon: '💌',
-    if: p => !!H.rel(p, 'partner') && !H.rel(p, 'spouse') && has(p, 'dating') && H.rel(p, 'partner').rel >= 55 && p.age >= 19 && !has(p, 'parent') && p.status !== 'military',
+    if: p => !p.flags.pregnant && !!H.rel(p, 'partner') && !H.rel(p, 'spouse') && has(p, 'dating') && H.rel(p, 'partner').rel >= 55 && p.age >= 19 && !has(p, 'parent') && p.status !== 'military',
     label: '연애', title: p => p.gender === 'F' ? '예상하지 못한 두 줄' : '연인이 임신했다',
     text: p => p.gender === 'F'
       ? `테스트기에 선명한 두 줄이 떴다. 떨리는 손으로 {partner}에게 전화를 걸었다. 결혼 얘기도 안 꺼냈는데. ${p.job ? '' : '아직 안정적인 일자리도 없다. '}머릿속이 하얘졌다.`
@@ -662,7 +742,7 @@
     text: '{parent}의 건강이 많이 나빠지셨다. 누군가 곁에 있어야 한다.',
     choices: [
       { id: 'care', label: '내가 모신다', intent: 'family',
-        out: { t: '퇴근하면 병간호가 기다린다. 힘들지만, 함께하는 시간이 소중하다.', log: '부모님을 모심', flag: ['caregiver', 'supporting_parents'], rel: { parents: 15 }, sr: 15, perf: -10, hp: -4, fn: p => { LG.Rel.parents(p).forEach(n => n.health = Math.min(100, n.health + 6)); return ''; } } },
+        out: { t: '퇴근하면 병간호가 기다린다. 힘들지만, 함께하는 시간이 소중하다.', log: '부모님을 모심', flag: ['caregiver', 'supporting_parents'], rel: { parents: 15 }, sr: 15, perf: -10, hp: 0, fn: p => { LG.Rel.parents(p).forEach(n => n.health = Math.min(100, n.health + 6)); return ''; } } },
       { id: 'facility', label: '요양 시설에 모신다', intent: 'stability',
         check: { base: 58, partial: 0, f: [['assets', 0.5]] },
         out: { success: { t: '좋은 시설을 찾았다. 주말마다 찾아뵙는다.', money: -1500, rel: { parents: -3 } }, fail: { t: '좋은 시설은 대기가 길고 비쌌다. 무리해서 모셨다.', money: -2500, sr: 8, rel: { parents: -6 } } } },
@@ -813,8 +893,8 @@
         check: { base: 34, partial: 0.4, f: [['perf', 0.4], ['flag', 'genius_founder', 18, '천재적인 아이디어'], ['stat', 'creativity', 0.2], ['talent', 'entrepreneur', 14], ['eff', 'work', 0.3], ['stat', 'mental', 0.2], ['fn', p => ({ label: '지금의 사업 상태', v: (p.job.mul - 1) * 20 })]] },
         out: {
           success: { t: '2호점, 3호점… 직원이 서른 명을 넘었다. 업계에서 이름이 오르내린다.', log: '사업 확장 성공', major: true, achv: 12, hp: 14, flag: 'business_success', fn: H.mulJob(2.2), queue: [{ id: 'ex_exit', in: 5 }] },
-          partial: { t: '확장은 했지만 늘어난 고정비가 버겁다. 조금 더 지켜봐야 한다.', debt: 1500, fn: H.mulJob(1.1), queue: [{ id: 'w_business_check', in: 4 }] },
-          fail: { t: '무리한 확장이 독이 됐다. 빚만 남기고 문을 닫았다.', log: '확장 실패로 폐업', major: true, quit: true, debt: 4500, flag: ['business_failed', 'closed_business'], hp: -18, sr: 22 }
+          partial: { t: '확장은 했지만 늘어난 고정비가 버겁다. 조금 더 지켜봐야 한다.', debt: 1500, debtKind: 'biz', fn: H.mulJob(1.1), queue: [{ id: 'w_business_check', in: 4 }] },
+          fail: { t: '무리한 확장이 독이 됐다. 빚만 남기고 문을 닫았다.', log: '확장 실패로 폐업', major: true, quit: true, debt: 4500, debtKind: 'biz', flag: ['business_failed', 'closed_business'], hp: -18, sr: 22 }
         } },
       { id: 'steady', label: '무리하지 않고 내실을 다진다', intent: 'stability',
         check: { base: 56, partial: 0.4, f: [['perf', 0.4], ['stat', 'mental', 0.2], ['fn', p => ({ label: '지금의 사업 상태', v: (p.job.mul - 1) * 15 })]] },
@@ -823,7 +903,7 @@
           fail: { t: '버텼지만 상권이 바뀌었다. 매출이 계속 줄어든다.', sr: 10, fn: H.mulJob(0.8), queue: [{ id: 'w_business_check', in: 3 }] }
         } },
       { id: 'close', label: '손해가 더 커지기 전에 정리한다', intent: 'money',
-        out: { t: '간판을 내렸다. 남은 집기를 정리하고 보니 생각보다 손해가 적었다. 빨리 접는 것도 용기다.', log: '사업을 정리함', quit: true, flag: 'closed_business', money: 500, hp: -6, sr: -6 } }
+        out: { t: '간판을 내렸다. 남은 집기를 정리하고 보니 생각보다 손해가 적었다. 빨리 접는 것도 용기다.', log: '사업을 정리함', quit: true, flag: 'closed_business', money: 500, hp: -3, sr: -6 } }
     ]
   });
 
@@ -947,8 +1027,12 @@
   // ───────────────────────── 돈 · 주거 ─────────────────────────
 
   E.push({
-    id: 'h_buy_house', cat: 'housing', tier: 'major', ages: [29, 62], w: 11, cd: 3, icon: '🏠',
-    if: p => !p.house && !!p.job && LG.State.netWorth(p) >= H.housePrice(p) * 0.18 && p.liveIn !== 'abroad',
+    id: 'h_buy_house', cat: 'housing', tier: 'major', ages: [29, 62], cd: 5, max: 3, icon: '🏠',
+    // 결혼했거나 30대 중반이 되면 '내 집' 고민은 피할 수 없는 갈림길이 된다 (몇 년에 한 번씩 다시 찾아온다)
+    milestone: p => (!!H.rel(p, 'spouse') || p.age >= 34) && p.age <= 55, prio: 1,
+    // 결혼·아이가 생기면 내 집 고민이 커진다 (한국 40대 자가 보유율 약 60%)
+    w: p => 14 + (H.rel(p, 'spouse') ? 16 : 0) + (H.kids(p).length ? 12 : 0) + (p.age >= 33 && p.age <= 50 ? 8 : 0) + (p.mkt && p.mkt.re === 'slump' ? 6 : 0),
+    if: p => !p.house && !!p.job && LG.State.netWorth(p) >= H.housePrice(p) * 0.1 && p.liveIn !== 'abroad',
     label: '내 집 마련', title: '집을 살까',
     text: p => `${S().liveRegion(p).short} 집값이 또 올랐다는 뉴스가 나온다. 시세는 ${LG.U.money(H.housePrice(p))}원. 지금이라도 사야 할까?`,
     choices: [
@@ -982,20 +1066,20 @@
   });
 
   E.push({
-    id: 'm_debt', cat: 'crisis', tier: 'major', ages: [20, 80], w: 26, cd: 5, icon: '🧾',
+    id: 'm_debt', cat: 'crisis', tier: 'major', ages: [20, 80], w: 26, cd: 3, icon: '🧾',
     if: p => has(p, 'heavy_debt'),
     label: '위기', title: '빚의 늪',
-    text: p => `빚이 ${LG.U.money(p.debt)}원. 이자가 벌이를 갉아먹는다. 독촉 전화가 온다.`,
+    text: p => { const L = LG.Loans, bad = L.amount(p, 'private') + L.amount(p, 'credit'); return `빚이 모두 ${LG.U.money(p.debt)}원${bad ? `, 그중 이자가 비싼 카드론·대부업 빚이 ${LG.U.money(bad)}원` : ''}. 이자가 벌이를 갉아먹는다.`; },
     choices: [
       { id: 'rehab', label: '개인회생을 신청한다', intent: 'stability',
         check: { base: 55, partial: 0, f: [['fn', p => p.job ? { label: '꾸준한 소득', v: 10 } : { label: '소득 없음', v: -10 }]] },
-        out: { success: { t: '회생이 인가됐다. 갚을 수 있는 만큼만 갚으면 된다.', log: '개인회생', hp: 6, sr: -14, flag: 'rehab', fn: p => { p.debt = Math.round(p.debt * 0.4); return ''; } }, fail: { t: '신청이 기각됐다.', sr: 8, hp: -6 } } },
+        out: { success: { t: '회생이 인가됐다. 갚을 수 있는 만큼만 갚으면 된다.', log: '개인회생', hp: 6, sr: -14, flag: 'rehab', fn: p => { const L = LG.Loans; ['install', 'biz'].forEach(k => { const x = L.amount(p, k); if (x) { L.pay(p, x, [k]); L.add(p, 'credit', x); } }); return H.toRehab(0.6)(p); } }, fail: { t: '신청이 기각됐다.', sr: 8, hp: -6 } } },
       { id: 'two', label: '투잡을 뛴다', intent: 'money',
         check: { base: 50, partial: 0, f: [['health', 0.3], ['stat', 'mental', 0.3]] },
         out: { success: { t: '밤낮으로 일했다. 빚이 조금씩 줄어든다.', money: 1800, st: { health: -4 }, sr: 8 }, fail: { t: '몸이 버티지 못했다.', st: { health: -9 }, sr: 8 } } },
       { id: 'family', label: '가족에게 도움을 청한다', intent: 'family', if: p => LG.Rel.parents(p).length > 0 || !!H.rel(p, 'sibling'),
         check: { base: 38, partial: 0, f: [['support', 0.4], ['family', 0.6]] },
-        out: { success: { t: '가족이 빚을 일부 갚아 줬다. 고개를 들 수 없었다.', rel: { parents: -4 }, fn: p => { p.debt = Math.max(0, p.debt - 3000); return ''; } }, fail: { t: '도움은커녕 꾸중만 들었다.', rel: { parents: -10, siblings: -6 }, hp: -6 } } }
+        out: { success: { t: '가족이 빚을 일부 갚아 줬다. 고개를 들 수 없었다.', rel: { parents: -4 }, fn: p => { const x = LG.Loans.pay(p, 3000, ['private', 'credit', 'install', 'biz']); if (x) LG.Loans.add(p, 'family', Math.round(x * 0.5)); return x ? `비싼 빚 ${LG.U.money(x)}원을 대신 갚아 주셨다. 절반은 나중에 갚기로 했다.` : ''; } }, fail: { t: '도움은커녕 꾸중만 들었다.', rel: { parents: -10, siblings: -6 }, hp: -6 } } }
     ]
   });
 

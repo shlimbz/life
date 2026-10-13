@@ -589,7 +589,7 @@
     text: '{parent}가 전화로 겨우 입을 떼셨다. "미안한데 이번 달 이자가 모자라서… 아니다, 괜찮다."',
     choices: [
       { id: 'help', label: '월급에서 돕는다', intent: 'family',
-        out: { t: '말없이 통장 이체 버튼을 눌렀다. 내 월급이 가족의 숨통이 되었다.', log: '가족의 빚을 도움', money: -800, rel: { parents: 14 }, flag: ['supporting_parents', 'helped_family'], hp: -2 } },
+        out: { t: '말없이 통장 이체 버튼을 눌렀다. 내 월급이 가족의 숨통이 되었다.', log: '가족의 빚을 도움', money: -800, rel: { parents: 14 }, flag: ['supporting_parents', 'helped_family'], hp: 2 } },
       { id: 'limit', label: '금액을 정해서 돕는다', intent: 'stability',
         out: { t: '"여기까지는 도울게요." 서운해하셨지만 이해해 주셨다.', money: -300, rel: { parents: 5 } } },
       { id: 'no', label: '내 생활이 먼저다', intent: 'independence', out: { t: '모른 척 하기가 쉽지 않았다. 며칠 동안 마음이 무거웠다.', rel: { parents: -12 }, sr: 8, hp: -4 } }

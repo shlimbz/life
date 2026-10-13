@@ -68,6 +68,7 @@
     { score: (p, s) => has(p, 'ex_trainee') || has(p, 'stage_actor') ? 40 : 0, t: '한때 무대를 꿈꿨던 사람.' },
     { score: (p, s) => has(p, 'cancer_survivor') ? 55 : 0, t: '큰 병을 이겨 내고 남은 날을 더 사랑한 사람.' },
     { score: (p, s) => has(p, 'debt_cleared') ? 46 : 0, t: '무거운 짐을 내려놓고 남은 날을 지킨 사람.' },
+    { score: (p, s) => has(p, 'property_investor') && s.money >= 70 ? 44 : 0, t: '부동산의 오르내림을 견디며 자산을 일군 사람.' },
     { score: (p, s) => has(p, 'found_calling') ? 55 : 0, t: '좋아하는 일을 끝내 놓지 않은 사람.' },
     { score: (p, s) => has(p, 'childfree_single') && s.happy >= 55 ? 50 : 0, t: '혼자서도 충분히 단단했던 사람.' },
     { score: (p, s) => has(p, 'career_break') === false && has(p, 'career_break_decided') && p.jobHistory.some(j => j.id === 'homemaker') ? 50 : 0, t: '멈췄던 자리에서 다시 걸어 나온 사람.' },

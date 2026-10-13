@@ -48,6 +48,12 @@
     if (has(p, 'chronic')) m *= kind === 'cancer' ? 1.05 : 1.35;
     if (LG.Style && LG.Style.active(p) && LG.Style.key(p) === 'health') m *= kind === 'cancer' ? 0.93 : 0.82;
     if (p.stats.health < 40) m *= 1.25;
+    // 몸과 마음의 상태: 건강·체력이 좋고 행복하면 덜 걸리고, 스트레스가 오래 쌓이면 더 걸린다 (심혈관 쪽이 더 민감)
+    const sens = kind === 'cancer' ? 0.4 : 1;
+    if (p.stats.health >= 70) m *= 1 - 0.15 * sens;
+    if (p.stats.physical >= 65) m *= 1 - 0.12 * sens;
+    if (p.happy >= 70) m *= 1 - 0.1 * sens;
+    if (p.stress >= 70) m *= 1 + 0.25 * sens;
     return m;
   }
 

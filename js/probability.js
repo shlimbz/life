@@ -66,10 +66,38 @@
         if (m) list.push({ label: T.name + ' 성격', v: m });
       });
     }
+    // 지금의 나(능력·건강·재산)가 같은 선택의 결과를 바꾼다 — 이벤트가 따로 정하지 않은 능력도 의도에 맞게 조금씩 반영
+    const used = new Set((check.f || []).map(s => s[0] === 'stat' ? s[1] : s[0]));
+    (PROFILE[intent] || []).forEach(([k, w, label]) => {
+      if (used.has(k)) return;
+      let v;
+      if (k === 'assets') { const r = F.assets(p, 1); v = r.v * w * 4; }
+      else if (k === 'health') v = (p.stats.health - 55) * w;
+      else if (k === 'happy') v = (p.happy - 55) * w;
+      else v = (p.stats[k] - 50) * w;
+      v = U().clamp(v, -8, 8);
+      if (Math.round(v) !== 0) list.push({ label, v: Math.round(v) });
+    });
     // 같은 방식을 거듭 택하면 그 방식에 익숙해진다 (숙련)
     if (intent && (p.intents[intent] || 0) >= 4 && INTENT_LABEL[intent]) list.push({ label: INTENT_LABEL[intent] + '(익숙함)', v: Math.min(5, Math.round(p.intents[intent] * 0.35)) });
     return list;
   }
+
+  // 의도별로 함께 작용하는 '지금의 나' (k, 가중치, 표시 이름)
+  const PROFILE = {
+    love: [['social', 0.14, '사교성'], ['physical', 0.08, '매력·체력'], ['health', 0.06, '건강'], ['assets', 0.12, '경제력'], ['happy', 0.06, '밝은 기분']],
+    career: [['intelligence', 0.12, '능력'], ['mental', 0.08, '정신력'], ['health', 0.05, '건강']],
+    risk: [['mental', 0.1, '배짱'], ['intelligence', 0.08, '판단력'], ['assets', 0.15, '자본'], ['social', 0.06, '인맥']],
+    adventure: [['mental', 0.08, '적응력'], ['social', 0.08, '사교성'], ['health', 0.06, '건강'], ['assets', 0.08, '여윳돈']],
+    education: [['intelligence', 0.12, '학습능력'], ['mental', 0.06, '끈기']],
+    family: [['social', 0.06, '배려심'], ['mental', 0.06, '마음의 여유'], ['assets', 0.08, '살림 형편']],
+    health: [['health', 0.1, '지금의 건강'], ['physical', 0.08, '운동능력'], ['mental', 0.06, '의지']],
+    social: [['social', 0.12, '사교성'], ['happy', 0.06, '밝은 기분']],
+    money: [['intelligence', 0.1, '판단력'], ['assets', 0.1, '자본']],
+    independence: [['mental', 0.1, '정신력'], ['assets', 0.06, '여윳돈']],
+    hobby: [['creativity', 0.1, '창의력']],
+    stability: [['mental', 0.06, '침착함']]
+  };
 
   function compute(p, check, intent, hasPartial) {
     const list = factors(p, check, intent);

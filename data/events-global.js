@@ -42,7 +42,7 @@
         out: {
           success: { t: '장학금과 대출을 엮어 비행기에 올랐다. 낯선 도시의 도서관에서 새벽까지 불이 꺼지지 않는다.', log: '해외 대학원 유학', major: true, quit: 'grad', flag: ['study_abroad', 'abroad_exp', 'grad_school'], exp: 12, rel: { parents: -4, friends: -8 }, hp: 8,
             fn: H.seq(H.college(3, 'grad'), p => { p.liveIn = 'abroad'; p.home = 'abroad'; p.queue.push({ id: 'gl_after_study', at: p.age + 3 }); return ''; }) },
-          partial: { t: '원하던 학교는 아니지만 입학했다. 학비 부담에 아르바이트를 병행하는 빡빡한 유학 생활이다.', log: '해외 대학원 유학(힘든 시작)', quit: 'grad', flag: ['study_abroad', 'abroad_exp', 'grad_school'], exp: 8, sr: 14, hp: 1, debt: 3000,
+          partial: { t: '원하던 학교는 아니지만 입학했다. 학비 부담에 아르바이트를 병행하는 빡빡한 유학 생활이다.', log: '해외 대학원 유학(힘든 시작)', quit: 'grad', flag: ['study_abroad', 'abroad_exp', 'grad_school'], exp: 8, sr: 14, hp: 1, debt: 3000, debtKind: 'student',
             fn: H.seq(H.college(3, 'grad'), p => { p.liveIn = 'abroad'; p.home = 'abroad'; p.queue.push({ id: 'gl_after_study', at: p.age + 3 }); return ''; }) },
           fail: { t: '비자 문제와 비용을 감당하지 못해 포기했다. 이메일 보관함에 합격 메일만 남았다.', hp: -9, sr: 12 }
         } },

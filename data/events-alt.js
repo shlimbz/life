@@ -43,7 +43,7 @@
           partial: { t: '데뷔는 했지만 아무도 우리를 모른다. 행사장 무대가 전부다.', log: '무명 아이돌로 데뷔', unflag: 'trainee', flag: 'idol_debut', sr: 14, fn: p => { LG.Outcome.setJob(p, 'idol', { mul: 0.4 }); p.queue.push({ id: 'al_idol_peak', at: p.age + 3 }); return ''; } },
           fail: { t: '데뷔조에서 빠졌다. 몇 년의 시간이 한 줄의 문자로 끝났다. 다시 교과서를 폈다.', log: '연습생 생활을 마침', major: true, unflag: 'trainee', flag: ['ex_trainee', 'gave_up_once'], hp: -14, sr: 16, eff: { study: -10 } }
         } },
-      { id: 'quit', label: '스스로 그만두고 학업으로 돌아간다', intent: 'stability', out: { t: '연습실 키를 반납했다. 아쉽지만 후회는 없다.', unflag: 'trainee', flag: 'ex_trainee', hp: -4, eff: { study: 8 } } }
+      { id: 'quit', label: '스스로 그만두고 학업으로 돌아간다', intent: 'stability', out: { t: '연습실 키를 반납했다. 아쉽지만 후회는 없다.', unflag: 'trainee', flag: 'ex_trainee', hp: -1, eff: { study: 8 } } }
     ]
   });
 
@@ -188,9 +188,9 @@
     title: '건물을 물려주시겠단다', text: p => `{parent}가 부르셨다. "세금 문제도 있고, 미리 넘겨 두려고 한다." ${p.family.ext > 0 ? '강남의 빌딩 한 채' : '역세권 상가 건물'}의 등기 서류가 탁자 위에 놓여 있었다.`,
     choices: [
       { id: 'landlord', label: '받아서 건물주로 산다 (일은 그만둔다)', intent: 'rest',
-        out: { t: '', log: '건물을 증여받아 건물주가 됨', major: true, hp: 12, rel: { parents: 6 }, flag: 'landlord', fn: p => { const v = p.family.ext > 0 ? 300000 : 120000; const tax = Math.round(v * 0.32); p.bldg = { value: v, yield: 0.032, label: p.family.ext > 0 ? '강남 빌딩' : '상가 건물' }; p.debt += Math.round(tax * 0.5); p.money -= Math.round(tax * 0.5); if (p.job) LG.Outcome.quitJob(p, 'idle'); else p.status = 'idle'; return `증여세 ${M(tax)}원을 내고(절반은 대출) 등기를 넘겨받았다. 매달 월세가 들어온다.`; } } },
+        out: { t: '', log: '건물을 증여받아 건물주가 됨', major: true, hp: 12, rel: { parents: 6 }, flag: 'landlord', fn: p => { const v = p.family.ext > 0 ? 300000 : 120000; const tax = Math.round(v * 0.32); p.bldg = { value: v, yield: 0.032, label: p.family.ext > 0 ? '강남 빌딩' : '상가 건물' }; LG.Loans.add(p, 'biz', Math.round(tax * 0.5), { term: 10 }); p.money -= Math.round(tax * 0.5); if (p.job) LG.Outcome.quitJob(p, 'idle'); else p.status = 'idle'; return `증여세 ${M(tax)}원을 내고(절반은 대출) 등기를 넘겨받았다. 매달 월세가 들어온다.`; } } },
       { id: 'both', label: '받되, 내 일은 계속한다', intent: 'career',
-        out: { t: '', log: '건물을 증여받음', hp: 8, rel: { parents: 4 }, flag: 'landlord', fn: p => { const v = p.family.ext > 0 ? 300000 : 120000; const tax = Math.round(v * 0.32); p.bldg = { value: v, yield: 0.032, label: p.family.ext > 0 ? '강남 빌딩' : '상가 건물' }; p.debt += Math.round(tax * 0.5); p.money -= Math.round(tax * 0.5); return '월세는 통장에 차곡차곡 쌓인다. 출근은 여전히 한다.'; } } },
+        out: { t: '', log: '건물을 증여받음', hp: 8, rel: { parents: 4 }, flag: 'landlord', fn: p => { const v = p.family.ext > 0 ? 300000 : 120000; const tax = Math.round(v * 0.32); p.bldg = { value: v, yield: 0.032, label: p.family.ext > 0 ? '강남 빌딩' : '상가 건물' }; LG.Loans.add(p, 'biz', Math.round(tax * 0.5), { term: 10 }); p.money -= Math.round(tax * 0.5); return '월세는 통장에 차곡차곡 쌓인다. 출근은 여전히 한다.'; } } },
       { id: 'refuse', label: '사양하고 내 힘으로 살겠다', intent: 'independence', out: { t: '"제 힘으로 해 보고 싶어요." {parent}가 한참 나를 바라보다 웃으셨다.', rel: { parents: 2 }, st: { mental: 3 }, hp: 4 } }
     ]
   });
@@ -203,8 +203,8 @@
       { id: 'cut', label: '월세를 낮춰 상생한다', intent: 'social', out: { t: '임차인들이 고맙다며 떡을 돌렸다. 수익은 줄었지만 공실이 사라졌다.', hp: 6, rel: { friends: 4 }, fn: p => { p.bldg.yield = Math.max(0.022, p.bldg.yield - 0.004); return ''; } } },
       { id: 'remodel', label: '대출로 리모델링해 가치를 올린다', intent: 'risk',
         check: { base: 55, partial: 0, f: [['stat', 'intelligence', 0.2], ['region', 'job', 0.2]] },
-        out: { success: { t: '새 단장 후 유명 브랜드가 입점했다. 건물값이 올랐다.', fn: p => { p.debt += 8000; p.bldg.value = Math.round(p.bldg.value * 1.18); p.bldg.yield += 0.003; return ''; } },
-          fail: { t: '공사비만 들고 공실은 그대로다.', sr: 12, fn: p => { p.debt += 8000; return ''; } } } },
+        out: { success: { t: '새 단장 후 유명 브랜드가 입점했다. 건물값이 올랐다.', fn: p => { LG.Loans.add(p, 'biz', 8000, { term: 10 }); p.bldg.value = Math.round(p.bldg.value * 1.18); p.bldg.yield += 0.003; return ''; } },
+          fail: { t: '공사비만 들고 공실은 그대로다.', sr: 12, fn: p => { LG.Loans.add(p, 'biz', 8000, { term: 10 }); return ''; } } } },
       { id: 'sell', label: '팔고 현금으로 바꾼다', intent: 'money', out: { t: '', log: '건물을 매각', fn: p => { const v = Math.round(p.bldg.value * 0.95); p.money += v; p.bldg = null; return `${M(v)}원에 건물을 넘겼다. 신경 쓸 일은 줄었다.`; } } }
     ]
   });
@@ -273,7 +273,7 @@
         check: { base: 30, partial: 0.4, f: [['fn', p => genius(p, ['math', 'entrepreneur', 'mechanical']) ? { label: '천재적 재능', v: 25 } : { label: '뛰어난 재능', v: 10 }], ['stat', 'creativity', 0.25], ['stat', 'mental', 0.2], ['assets', 0.1]] },
         out: { success: { t: '투자를 받았다. 차고에서 시작한 회사에 직원이 생겼다. 세상이 내 아이디어를 쓰기 시작했다.', log: '천재 창업가의 첫 투자 유치', major: true, achv: 10, hp: 14, flag: ['genius_founder', 'started_business'], fn: p => { p.college = null; LG.Outcome.setJob(p, 'ceo', { mul: 1.4 }); p.queue.push({ id: 'w_business_check', at: p.age + 2 }); return ''; } },
           partial: { t: '회사는 만들었지만 돈이 빠르게 줄어든다. 버텨야 한다.', log: '조기 창업', flag: ['genius_founder', 'started_business'], fn: p => { p.college = null; LG.Outcome.setJob(p, 'ceo', { mul: 0.6 }); p.queue.push({ id: 'w_business_check', at: p.age + 2 }); return ''; } },
-          fail: { t: '더 큰 회사가 비슷한 서비스를 내놓았다. 6개월 만에 접었다. 그래도 배운 게 많다.', log: '첫 창업 실패', flag: ['business_failed', 'gave_up_once'], debt: 1500, hp: -10 } } },
+          fail: { t: '더 큰 회사가 비슷한 서비스를 내놓았다. 6개월 만에 접었다. 그래도 배운 게 많다.', log: '첫 창업 실패', flag: ['business_failed', 'gave_up_once'], debt: 1500, debtKind: 'biz', hp: -10 } } },
       { id: 'sell', label: '아이디어를 회사에 판다', intent: 'money', out: { t: '대기업이 서비스를 사 갔다. 스무 살 남짓에 목돈이 생겼다.', log: '아이디어를 매각', money: 15000, achv: 6, hp: 10 } },
       { id: 'later', label: '학업을 마치고 생각한다', intent: 'education', out: { t: '서두르지 않기로 했다. 아이디어는 노트에 고이 적어 두었다.', eff: { study: 8 } } }
     ]

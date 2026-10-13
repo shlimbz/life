@@ -22,10 +22,10 @@
     if (age < 6) return 0;
     if (age < 13) return 0.12;
     if (age < 19) return 0.2;
-    if (age < 35) return 0.22;
-    if (age < 50) return 0.18;
-    if (age < 65) return 0.17;
-    if (age < 85) return 0.22;
+    if (age < 35) return 0.16;
+    if (age < 50) return 0.14;   // 30~50대는 내 집 마련·대출 같은 정해진 갈림길이 많아 무작위 선택은 조금 줄인다
+    if (age < 65) return 0.15;
+    if (age < 85) return 0.17;
     return 0.17;
   }
 
@@ -92,6 +92,9 @@
     return keep.map(i => list[i]);
   }
 
+  // 마일스톤: 항상(true) 또는 조건부(함수) — 조건이 맞을 때만 '정해진 갈림길'로 취급한다
+  const isMs = (p, e) => typeof e.milestone === 'function' ? !!e.milestone(p) : !!e.milestone;
+
   // 1년 동안 일어날 일 고르기
   function pickYear(p) {
     const lines = [];
@@ -112,13 +115,13 @@
 
     // 2. 마일스톤 (인생의 정해진 갈림길)
     if (!choiceEv) {
-      const ms = all().filter(e => e.milestone && eligible(p, e)).sort((a, b) => (b.prio || 0) - (a.prio || 0));
+      const ms = all().filter(e => isMs(p, e) && eligible(p, e)).sort((a, b) => (b.prio || 0) - (a.prio || 0));
       if (ms.length) choiceEv = ms[0];
     }
 
     // 3. 확률적 선택 이벤트
     if (!choiceEv && R().chance(p, choiceRate(p.age))) {
-      const pool = all().filter(e => e.tier !== 'auto' && !e.milestone && eligible(p, e));
+      const pool = all().filter(e => e.tier !== 'auto' && !isMs(p, e) && eligible(p, e));
       choiceEv = R().weighted(p, pool, e => weight(p, e));
     }
 
@@ -140,6 +143,8 @@
         if (r > 0 && R().chance(p, r)) { const l = runAuto(p, e); if (l) lines.push(l); }
       });
     }
+    // 자동 사건이 바로 이어지는 선택을 만들었으면(예: 로또 당첨 → 돈을 어떻게 할까) 같은 해에 띄운다
+    if (!choiceEv) choiceEv = nextChained(p);
     // 자동 사건 때문에 선택 이벤트의 전제가 깨졌으면(예: 부모님이 이미 이혼) 이번 해에는 띄우지 않는다
     if (choiceEv && !eligible(p, choiceEv, true)) choiceEv = null;
     if (choiceEv) bindCtx(p, choiceEv);
@@ -153,7 +158,15 @@
     const kid = typeof ev.child === 'function' ? ev.child(p) : null;
     const who = typeof ev.who === 'function' ? ev.who(p) : null;
     p.ctx = { ev: ev.id, partner: nm('partner'), spouse: nm('spouse'), child: kid ? kid.id : null, who: who ? who.id : null };
+    // 제목·선택지 문구도 연 순간의 모습으로 고정한다 (예: "둘째를 갖는다"를 고른 뒤 아이가 태어나도 "셋째"로 바뀌지 않게)
+    try {
+      p.ctx.title = render(p, ev.title);
+      p.ctx.labels = {};
+      (ev.choices || []).forEach(c => { p.ctx.labels[c.id] = render(p, c.label); });
+    } catch (e) { /* 문구 계산 실패 시 나중에 다시 그린다 */ }
   }
+  const titleOf = (p, ev) => (p.ctx && p.ctx.ev === ev.id && p.ctx.title) || render(p, ev.title);
+  const labelOf = (p, ev, c) => (p.ctx && p.ctx.ev === ev.id && p.ctx.labels && p.ctx.labels[c.id]) || render(p, c.label);
 
   // 같은 해에 이어지는 예약 이벤트 (예: 합격 → 전공 선택)
   function nextChained(p) {
@@ -171,7 +184,8 @@
     const friend = LG.Rel.all(p, 'friend')[0];
     const ctx = p.ctx || {};
     const byId = id => id != null ? p.people.find(n => n.id === id) : null;
-    const child = byId(ctx.child) || LG.Rel.all(p, 'child')[0];
+    const bound = byId(ctx.child);
+    const child = (bound && bound.alive ? bound : null) || LG.Rel.all(p, 'child')[0];
     const who = byId(ctx.who);
     const parent = LG.Rel.get(p, 'mother') || LG.Rel.get(p, 'father') || LG.Rel.get(p, 'grandparent');
     const sib = LG.Rel.get(p, 'sibling');
@@ -228,6 +242,8 @@
 
   function resolve(p, ev, choiceId) {
     const c = visibleChoices(p, ev).find(x => x.id === choiceId) || (ev.choices || []).find(x => x.id === choiceId);
+    if (!p.ctx || p.ctx.ev !== ev.id) bindCtx(p, ev);
+    const title = titleOf(p, ev), label = labelOf(p, ev, c);
     const before = LG.Outcome.snapshot(p);
     S().intent(p, c.intent);
     p.choices++;
@@ -240,8 +256,10 @@
     } else out = c.out || {};
     if (c.check) out = stake(out, c.intent, type);
     const extra = LG.Outcome.apply(p, out, { ev, choice: c, type });
+    // 큰 성취(큰돈·큰 성공)를 스스로 이뤄 내면 자신감이 붙는다 → 정신력 +1
+    if (type === 'success' && c.check && ((out.achv || 0) >= 5 || (out.money || 0) >= 3000)) S().addStat(p, 'mental', 1);
     const text = render(p, out.t);
-    const log = render(p, out.log) || (render(p, ev.title) + ': ' + render(p, c.label) + (type === 'fail' ? ' (실패)' : type === 'partial' ? ' (절반의 성공)' : ''));
+    const log =render(p, out.log) || (title + ': ' + label + (type === 'fail' ? ' (실패)' : type === 'partial' ? ' (절반의 성공)' : ''));
     LG.Timeline.add(p, log, out.minor ? 'minor' : 'choice', ev.icon || '', !!out.log);
     p.done[ev.id] = (p.done[ev.id] || 0) + 1;
     if (ev.cd) p.cool[ev.id] = p.age + (typeof ev.cd === 'function' ? ev.cd(p) : ev.cd);
@@ -256,14 +274,18 @@
         Math.abs(after.health - before.health) * 0.4 + Math.log10(1 + dMoney / 100) * 3 + (c.intent === 'risk' || c.intent === 'adventure' ? 3 : 0);
       if (ev.cat === 'life') w *= 0.5;
       p.cross = p.cross || [];
-      p.cross.push({ a: p.age, ic: ev.icon || '', ti: render(p, ev.title), ch: render(p, c.label), ty: type, tx: (render(p, out.t) || '').slice(0, 90), w: Math.round(w * 10) / 10 });
+      p.cross.push({ a: p.age, ic: ev.icon || '', ti: title, ch: label, ty: type, tx: (render(p, out.t) || '').slice(0, 90), w: Math.round(w * 10) / 10 });
       if (p.cross.length > 60) { p.cross.sort((x, y) => y.w - x.w); p.cross.length = 40; p.cross.sort((x, y) => x.a - y.a); }
     }
     const fx = prob ? prob.factors : [];
+    const deltas = LG.Outcome.diff(before, after);
+    const fxs = LG.Outcome.fxText(deltas);
+    const hl = p.history[p.history.length - 1];
+    if (hl && fxs) hl.fx = fxs;
     return {
-      ev, choice: c, type, prob,
-      text: (text + (extra ? ' ' + extra : '')).trim(),
-      deltas: LG.Outcome.diff(before, after),
+      ev, choice: c, type, prob, title, label,
+      text: (text + (extra ? ' ' + render(p, extra) : '')).trim(),
+      deltas, fx: fxs,
       help: fx.filter(x => x.v > 0).slice(0, 3).map(x => x.label),
       hurt: fx.filter(x => x.v < 0).slice(0, 3).map(x => x.label),
       steps: c.steps || [`'${c.label}'`, ev.wait || '결과를 기다리는 중']
@@ -279,21 +301,30 @@
       out = ev.out[type] || ev.out.fail;
     }
     if (out.skip) return null;
+    const before = LG.Outcome.snapshot(p);
     const extra = LG.Outcome.apply(p, out, { ev });
     const text = render(p, out.t);
+    const deltas = LG.Outcome.diff(before, LG.Outcome.snapshot(p));
     if (out.next) p.queue.unshift({ id: out.next, at: p.age, chain: true });
     p.done[ev.id] = (p.done[ev.id] || 0) + 1;
     if (ev.cd) p.cool[ev.id] = p.age + (typeof ev.cd === 'function' ? ev.cd(p) : ev.cd);
-    const full = (text + (extra ? ' ' + extra : '')).trim();
+    const full = (text + (extra ? ' ' + render(p, extra) : '')).trim();
     const major = !!(out.major || ev.major);
+    const fxs = LG.Outcome.fxText(deltas);
     LG.Timeline.add(p, render(p, out.log) || full, major ? 'major' : 'minor', ev.icon || '');
-    return { t: full, icon: ev.icon || '•', major, logged: true };
+    if (fxs) p.history[p.history.length - 1].fx = fxs;
+    // 큰 사건은 로그 한 줄로 흘려보내지 않고 카드로 멈춰서 보여 준다 (무엇이 얼마나 바뀌었는지와 함께)
+    const card = !!(ev.card || out.card) && (major || deltas.length >= 2);
+    return { t: full, fx: fxs, icon: ev.icon || '•', major, logged: true, card: card ? { title: render(p, ev.title) || render(p, out.log) || '큰일', icon: ev.icon || '❗', text: full, deltas } : null };
   }
 
   // 잔잔한 일상 문장 하나 (나와 이어진 문장일수록 더 자주 뽑힌다)
   function flavorOne(p, taken) {
     p.recent = p.recent || [];
-    const list = (LG.DATA.flavor || []).filter(f => p.age >= f.a[0] && p.age <= f.a[1] && (!f.if || f.if(p)) && p.recent.indexOf(f.t) < 0 && taken.indexOf(f) < 0);
+    const fits = f => p.age >= f.a[0] && p.age <= f.a[1] && (!f.if || f.if(p)) && taken.indexOf(f) < 0;
+    let list = (LG.DATA.flavor || []).filter(f => fits(f) && p.recent.indexOf(f.t) < 0);
+    // 문장이 바닥나면(아주 오래 산 경우) 최근 몇 해에 나온 것만 피하고 다시 쓴다 → 해마다 로그가 비지 않게
+    if (!list.length) { const near = p.recent.slice(-8); list = (LG.DATA.flavor || []).filter(f => fits(f) && near.indexOf(f.t) < 0); }
     if (!list.length) return null;
     const pick = R().weighted(p, list, f => (f.if ? 3 : 1) * (f.w || 1) * LG.Aff.mult(p, f.dom));
     if (!pick) return null;

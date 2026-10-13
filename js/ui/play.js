@@ -19,7 +19,7 @@
     guardBack();
     $('#feed').innerHTML = '';
     $('#event').classList.add('hidden');
-    $('#stage').classList.remove('has-event');
+    $('#stage').classList.remove('has-event'); document.body.classList.remove('ev-open');
     st.paused = false; st.eventOpen = false; st.busy = false; st.sheetOpen = false; st.dash = null;
     st.speed = LG.Storage.prefs().speed || 1;
     updateCtrl();
@@ -29,7 +29,7 @@
       let cur = null, block = null;
       recent.forEach(h => {
         if (h.a !== cur) { cur = h.a; block = yearBlock(h.a); }
-        addLine(block, { t: h.t, icon: h.i, major: h.k === 'major' || h.k === 'birth', reflect: h.k === 'reflect', choice: h.k === 'choice' }, true);
+        addLine(block, { t: h.t, fx: h.fx, icon: h.i, major: h.k === 'major' || h.k === 'birth', reflect: h.k === 'reflect', choice: h.k === 'choice' }, true);
       });
     } else {
       const b = yearBlock(0);
@@ -60,6 +60,10 @@
     updateHUD();
     LG.Storage.save(p);
     if (r.death) return deathSequence();
+    // 큰 사건(사고·복권·사별 등)은 카드로 멈춰 보여 준 뒤 이어 간다
+    const cards = r.lines.filter(l => l.card).map(l => l.card);
+    const next = () => { if (r.event) openEvent(r.event); else schedule(600); };
+    if (cards.length) { setTimeout(() => K.openNotice(cards, next), (420 + r.lines.length * 260) / st.speed); return; }
     if (r.event) { setTimeout(() => openEvent(r.event), (420 + r.lines.length * 260) / st.speed); return; }
     schedule(LG.Game.yearDelay(p.age) / st.speed + r.lines.length * 330 / st.speed);
   }
@@ -80,7 +84,7 @@
   function addLine(block, l, noScroll) {
     const d = document.createElement('div');
     d.className = 'ln' + (l.major ? ' major' : '') + (l.flavor ? ' flavor' : '') + (l.reflect ? ' reflect' : '') + (l.choice ? ' picked' : '');
-    d.innerHTML = `<span class="i">${esc(l.icon || '·')}</span><span>${esc(l.t)}</span>` + (l.res ? `<span class="res ${l.res}">${{ success: '성공', partial: '부분 성공', fail: '실패' }[l.res]}</span>` : '');
+    d.innerHTML = `<span class="i">${esc(l.icon || '·')}</span><span>${esc(l.t)}${l.fx ? ` <em class="fx">${esc(l.fx)}</em>` : ''}</span>` + (l.res ? `<span class="res ${l.res}">${{ success: '성공', partial: '부분 성공', fail: '실패' }[l.res]}</span>` : '');
     block.appendChild(d);
     const f = $('#feed');
     if (!noScroll) f.scrollTo({ top: f.scrollHeight, behavior: 'smooth' });
@@ -104,6 +108,17 @@
     return `<div class="bc${inv ? ' stress' : ''}"><span class="bl">${label}</span><div class="bt"><i class="${barTone(v, inv)}" style="width:${U.clamp(v, 0, 100)}%"></i></div><b>${v}</b></div>`;
   }
 
+  // 보유 내역: 순자산을 이루는 것들을 따로 보여 준다 (0인 항목은 생략)
+  function holdings(p) {
+    const inv = p.inv || { deposit: 0, stock: 0, crypto: 0 };
+    return [
+      { label: '현금', v: Math.max(0, p.money) }, { label: '예적금', v: inv.deposit }, { label: '주식', v: inv.stock }, { label: '코인', v: inv.crypto },
+      { label: '리츠', v: inv.reit || 0 },
+      { label: '집', v: p.house ? p.house.value : 0 }, { label: '투자 부동산', v: p.prop ? p.prop.value : 0 }, { label: '건물', v: p.bldg ? p.bldg.value : 0 }, { label: '차', v: p.car ? p.car.value : 0 },
+      { label: '빚', v: p.debt, neg: true }
+    ].filter(h => Math.round(h.v) >= 10);
+  }
+
   function dashHTML() {
     let p = K.p;
     const stt = p.stats;
@@ -124,16 +139,16 @@
         <button class="dchip tap" data-open="people" type="button">${p.people.some(n => n.alive && n.role === 'spouse') ? '💍' : p.people.some(n => n.alive && n.role === 'partner') ? '💗' : '🙂'} ${esc(S.relLabel(p))}</button>
       </div>
       <button class="d-money" data-open="asset" type="button" aria-label="자산 관리 열기">
-        <div class="mc" id="mc-nw"><span>순자산</span><b>${U.money(nw)}</b><small>${p.debt > 0 ? '빚 ' + U.money(p.debt) : p.house ? '집 ' + U.money(p.house.value) : '&nbsp;'}</small></div>
-        <div class="mc"><span>현금 · 투자</span><b>${U.money(Math.max(0, p.money) + inv)}</b><small>${inv > 0 ? '투자 ' + U.money(inv) : '현금 ' + U.money(Math.max(0, p.money))}</small></div>
+        <div class="mc main" id="mc-nw"><span>순자산 <em>(가진 것 − 빚)</em></span><b>${U.money(nw)}</b></div>
         <div class="mc"><span>월 수입</span><b>${p.age >= 19 && mi > 0 ? U.money(mi) : '—'}</b><small>${p.age >= 19 && p.lastNet != null ? (p.lastNet >= 0 ? '월 저축 +' : '월 적자 -') + U.money(Math.abs(Math.round(p.lastNet / 12))) : '&nbsp;'}</small></div>
+        <div class="as-chips">${holdings(p).map(h => `<span class="ah ${h.neg ? 'neg' : ''}">${h.label} <b>${h.neg ? '-' : ''}${U.money(h.v)}</b></span>`).join('') || '<span class="ah">아직 가진 것이 없다</span>'}</div>
         <span class="chev">›</span>
       </button>
-      <div class="d-bars">
+      <button class="d-bars" data-open="stats" type="button" aria-label="능력치 설명 보기">
         ${bar('건강', stt.health)}${bar('행복', p.happy)}${bar('스트레스', p.stress, true)}
         ${bar('학습', stt.intelligence)}${bar('운동', stt.physical)}${bar('사교', stt.social)}
-        ${bar('창의', stt.creativity)}${bar('정신', stt.mental)}${bar('관계', S.relScore(p))}
-      </div>
+        ${bar('창의', stt.creativity)}${bar('멘탈', stt.mental)}${bar('관계', S.relScore(p))}
+      </button>
       <div class="d-tags">
         ${found.map(t => `<span class="tg tal">${t.icon} ${esc(t.name)}</span>`).join('')}${hidden ? '<span class="tg dim">✨ 숨은 재능?</span>' : ''}
         ${(() => { const t = LG.Timeline.tendency(p); return t ? `<span class="tg tal">${t.icon} ${esc(t.name)}</span>` : ''; })()}
@@ -169,8 +184,8 @@
   });
 
   function updateCtrl() {
-    $('#btn-speed').textContent = st.speed + '×';
-    $('#btn-pause').textContent = st.paused ? '▶' : '❚❚';
+    $('#btn-speed').innerHTML = `<i>${st.speed}×</i><span>속도</span>`;
+    $('#btn-pause').innerHTML = st.paused ? '<i>▶</i><span>계속</span>' : '<i>❚❚</i><span>멈춤</span>';
     $('#btn-pause').setAttribute('aria-label', st.paused ? '계속' : '일시정지');
   }
 

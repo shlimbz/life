@@ -139,7 +139,7 @@
       { id: 'honest', label: '있는 그대로 인정하고 반성한다', intent: 'stability',
         check: { base: 62, partial: 0.4, f: [['stat', 'mental', 0.2], ['rel', 'mother', 0.1]] },
         out: {
-          success: { t: '반성문과 상담으로 처분이 경미하게 끝났다. 어른들은 "다시 시작할 기회"라고 했다.', log: '잘못을 인정하고 반성해 마무리', flag: 'turned_around', st: { mental: 3 }, hp: -2, sr: 4 },
+          success: { t: '반성문과 상담으로 처분이 경미하게 끝났다. 어른들은 "다시 시작할 기회"라고 했다.', log: '잘못을 인정하고 반성해 마무리', flag: 'turned_around', st: { mental: 3 }, hp: 0, sr: 4 },
           partial: { t: '보호관찰 처분이 내려졌다. 한 해 동안 조심스럽게 지내야 한다.', log: '보호관찰 처분', flag: 'probation', hp: -8, sr: 12 },
           fail: { t: '합의금과 처분으로 집안이 휘청였다. 낙인이 쉽게 사라질 것 같지 않다.', log: '큰 처분을 받음', flag: 'probation', hp: -14, sr: 18, money: -400, fn: jp(1) }
         } },
@@ -160,7 +160,7 @@
           fail: { t: '상대가 크게 다쳤다. 합의금과 처분이 남았다. 마음이 한동안 무거웠다.', log: '싸움으로 상대가 크게 다침', flag: ['school_fight', 'school_violence_record', 'juvenile_record'], hp: -18, sr: 22, rel: { parents: -12 }, money: -500, queue: [{ id: 'd_police', in: 0 }] }
         } },
       { id: 'walk', label: '눈을 피하고 자리를 뜬다', intent: 'stability',
-        out: { t: '자존심은 상했지만 주먹은 쓰지 않았다. 나중에 보니 그게 맞는 선택이었다.', log: '싸움을 피함', st: { mental: 2 }, hp: -2 } },
+        out: { t: '자존심은 상했지만 주먹은 쓰지 않았다. 나중에 보니 그게 맞는 선택이었다.', log: '싸움을 피함', st: { mental: 2 }, hp: 0 } },
       { id: 'teacher', label: '선생님을 불러온다', intent: 'stability',
         out: { t: '선생님이 개입해 사건은 마무리되었다. 아이들은 "고자질"이라 수군댔지만 나는 괜찮았다.', hp: 1, st: { social: -1, mental: 1 } } }
     ]
@@ -272,7 +272,7 @@
           fail: { t: '신고 이후 보복성 연락이 이어졌다. 결국 이사를 결심했다.', log: '스토킹 때문에 이사', hp: -12, sr: 18, money: -300, fn: p => { p.flags.moved_stalk = p.age; return ''; } }
         } },
       { id: 'move', label: '번호를 바꾸고 이사한다', intent: 'independence',
-        out: { t: '모든 연락처를 정리하고 이사했다. 돈은 들었지만 숨통이 트였다.', log: '스토킹을 피해 이사', money: -250, hp: -2, sr: -2 } },
+        out: { t: '모든 연락처를 정리하고 이사했다. 돈은 들었지만 숨통이 트였다.', log: '스토킹을 피해 이사', money: -250, hp: 2, sr: -2 } },
       { id: 'talk', label: '직접 만나 담판을 짓는다', intent: 'risk',
         check: { base: 24, partial: 0.4, f: [['stat', 'mental', 0.3]] },
         out: {
@@ -369,13 +369,13 @@
     title: '도박 빚', text: '대출 알림이 하루에도 여러 번 온다. 가족 몰래 돈을 빌렸고, 이자는 눈덩이처럼 불어났다. 이제는 어디서부터 어떻게 풀어야 할지 모르겠다.',
     choices: [
       { id: 'confess', label: '가족에게 고백하고 상담·회생 절차를 밟는다', intent: 'family',
-        out: { t: '무릎 꿇고 사실을 털어놨다. 가족은 화냈지만 끝내 곁을 지켜 주었다. 개인회생과 도박중독 상담을 받았다.', log: '가족에게 고백하고 도박을 끊음', unflag: 'gambling_debt', hp: -4, sr: -2, debt: 800, rel: { family: -4 }, flag: 'turned_around', st: { mental: 2 } } },
+        out: { t: '무릎 꿇고 사실을 털어놨다. 가족은 화냈지만 끝내 곁을 지켜 주었다. 개인회생과 도박중독 상담을 받았다.', log: '가족에게 고백하고 도박을 끊음', unflag: 'gambling_debt', hp: -4, sr: -2, debt: 800, debtKind: 'family', rel: { family: -4 }, flag: 'turned_around', st: { mental: 2 }, fn: p => { const x = LG.Loans.amount(p, 'private') + LG.Loans.amount(p, 'credit'); if (x) { LG.Loans.pay(p, x, ['private', 'credit']); LG.Loans.add(p, 'family', x); return `대부업·카드 빚 ${LG.U.money(x)}원을 가족이 먼저 갚아 주었다. 이제 가족에게 천천히 갚아 나간다.`; } return ''; } } },
       { id: 'borrow', label: '다른 곳에서 빌려 막는다', intent: 'risk',
         check: { base: 22, partial: 0.3, f: [['trait', 'careful', 5]] },
         out: {
           success: { t: '운 좋게 한 번에 정리되었다. 다신 안 하겠다고 맹세했다.', unflag: 'gambling_debt', hp: 2, sr: -2 },
-          partial: { t: '돌려막기로 한 해를 버텼다. 마음은 지옥이다.', debt: 1500, sr: 18, hp: -12 },
-          fail: { t: '이자가 이자를 낳았다. 신용불량자가 되었고 직장에도 소문이 퍼졌다.', log: '도박 빚으로 신용불량', major: true, debt: 3500, hp: -20, sr: 24, perf: -12, rel: { family: -10 } }
+          partial: { t: '돌려막기로 한 해를 버텼다. 마음은 지옥이다.', debt: 1500, debtKind: 'private', sr: 18, hp: -12 },
+          fail: { t: '이자가 이자를 낳았다. 신용불량자가 되었고 직장에도 소문이 퍼졌다.', log: '도박 빚으로 신용불량', major: true, debt: 3500, debtKind: 'private', hp: -20, sr: 24, perf: -12, rel: { family: -10 } }
         } }
     ]
   });
@@ -410,20 +410,20 @@
     title: '급전의 유혹', text: '카드값과 월세가 겹쳐 당장 돈이 모자란다. 문자로 "당일 대출·무심사·신용불량 OK"라는 광고가 쉴 새 없이 온다. 은행은 문턱이 높다.',
     choices: [
       { id: 'family', label: '가족·지인에게 어렵게 부탁한다', intent: 'family',
-        out: { t: '체면은 구겨졌지만 가족이 돈을 빌려줬다. "다음엔 먼저 말해." 따뜻한 한마디가 오래 남았다.', log: '가족에게 도움을 받음', debt: 500, rel: { family: 2 }, hp: -2, sr: -2 } },
+        out: { t: '체면은 구겨졌지만 가족이 돈을 빌려줬다. "다음엔 먼저 말해." 따뜻한 한마디가 오래 남았다.', log: '가족에게 도움을 받음', debt: 500, debtKind: 'family', rel: { family: 2 }, hp: 1, sr: -2 } },
       { id: 'official', label: '서민금융·햇살론을 알아본다', intent: 'stability',
         check: { base: 56, partial: 0.4, f: [['stat', 'intelligence', 0.2], ['trait', 'careful', 5]] },
         out: {
-          success: { t: '정부 서민금융으로 낮은 금리의 대출을 받았다. 한숨 돌렸다.', log: '서민금융으로 위기 넘김', debt: 600, hp: 2 },
-          partial: { t: '한도가 낮아 일부만 해결되었다.', debt: 400, sr: 6 },
+          success: { t: '정부 서민금융으로 낮은 금리의 대출을 받았다. 한숨 돌렸다.', log: '서민금융으로 위기 넘김', debt: 600, debtKind: 'biz', hp: 2 },
+          partial: { t: '한도가 낮아 일부만 해결되었다.', debt: 400, debtKind: 'biz', sr: 6 },
           fail: { t: '심사에서 탈락했다. 시간만 허비했다.', sr: 12, hp: -4 }
         } },
       { id: 'shark', label: '당일 대출을 받는다', intent: 'risk',
         check: { base: 24, partial: 0.3, f: [['trait', 'careful', 6]] },
         out: {
-          success: { t: '합법 업체였고 다행히 빨리 갚았다. 식은땀을 흘렸다.', debt: 300, sr: 4 },
-          partial: { t: '이자가 상상 이상이었다. 갚느라 허덕인다.', debt: 900, sr: 12, hp: -6 },
-          fail: { t: '불법 사채였다. 협박 전화와 직장 문자까지 오기 시작했다. 인생이 무너지는 소리가 났다.', log: '불법 사채에 빠짐', major: true, debt: 3000, hp: -18, sr: 24, perf: -10, flag: 'loan_shark' }
+          success: { t: '합법 업체였고 다행히 빨리 갚았다. 식은땀을 흘렸다.', debt: 300, debtKind: 'private', sr: 4 },
+          partial: { t: '이자가 상상 이상이었다. 갚느라 허덕인다.', debt: 900, debtKind: 'private', sr: 12, hp: -6 },
+          fail: { t: '불법 사채였다. 협박 전화와 직장 문자까지 오기 시작했다. 인생이 무너지는 소리가 났다.', log: '불법 사채에 빠짐', major: true, debt: 3000, debtKind: 'private', hp: -18, sr: 24, perf: -10, flag: 'loan_shark' }
         } }
     ]
   });

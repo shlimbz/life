@@ -79,7 +79,7 @@
         luck: 0, luckLog: { good: 0, bad: 0 },
         effort: { study: 0, sport: 0, art: 0, work: 0, health: 0, social: 0 },
         happy: 65, stress: 15,
-        money: 0, debt: 0, house: null, home: 'parents', homeLabel: '',
+        money: 0, debt: 0, loans: [], prop: null, house: null, home: 'parents', homeLabel: '',
         edu: 'none', major: null, track: null, college: null,
         status: 'child', job: null, jobHistory: [], lastSalary: 0, militaryUntil: 0,
         people: [], nextId: 1,
@@ -95,6 +95,8 @@
 
     has(p, f) { return Object.prototype.hasOwnProperty.call(p.flags, f); },
     flag(p, f) { if (!State.has(p, f)) p.flags[f] = p.age; },
+    // 소년소녀가장: 부모가 없거나 극빈 가정에서 집안을 떠맡은 아이 — 이 경우에만 미성년도 빚을 진다
+    youngCarer(p) { return p.age < 19 && (State.has(p, 'young_carer') || LG.Rel.parents(p).length === 0 || (p.family.ext < 0 && LG.Rel.parents(p).every(n => (n.health || 70) < 35))); },
     unflag(p, f) { delete p.flags[f]; },
     hasTrait(p, t) { return p.traits.indexOf(t) >= 0; },
     hasTalent(p, t) { return p.talents.indexOf(t) >= 0; },
@@ -104,7 +106,7 @@
       else p.stats[k] = U.clamp(p.stats[k] + d, 1, 100);
     },
 
-    netWorth(p) { return p.money + (p.inv ? p.inv.deposit + p.inv.stock + p.inv.crypto : 0) + (p.house ? p.house.value : 0) + (p.car ? p.car.value : 0) + (p.bldg ? p.bldg.value : 0) - p.debt; },
+    netWorth(p) { return p.money + (p.inv ? p.inv.deposit + p.inv.stock + p.inv.crypto + (p.inv.reit || 0) : 0) + (p.house ? p.house.value : 0) + (p.prop ? p.prop.value : 0) + (p.car ? p.car.value : 0) + (p.bldg ? p.bldg.value : 0) - p.debt; },
 
     // 예전 세이브에 새 필드를 채워 넣는다
     // 재능 발견 기록 (언제, 어떻게 알게 되었는지) — 엔딩에서 보여 준다
@@ -120,7 +122,7 @@
     // ───── 저장 데이터 버전 관리 ─────
     // 상태 구조가 바뀔 때마다 SAVE_VERSION 을 올리고, MIGRATIONS 에 '이전 버전 → 다음 버전' 변환 함수를 하나 추가한다.
     // 불러올 때 저장본의 버전부터 현재 버전까지 차례로 적용한다. 각 단계는 여러 번 실행해도 안전해야 한다(멱등).
-    SAVE_VERSION: 7,
+    SAVE_VERSION: 8,
     MIGRATIONS: {
       // v1 → v2: 자산관리(투자) 도입
       1: p => { p.inv = p.inv || { deposit: 0, stock: 0, crypto: 0 }; if (p.invPolicy === undefined) p.invPolicy = null; if (p.invLast === undefined) p.invLast = null; p.catLast = p.catLast || {}; p.mkt = p.mkt || null; },
@@ -133,7 +135,20 @@
       // v5 → v6: 질병(p.dz) · 자동차(p.car)
       5: p => { p.dz = p.dz || {}; if (p.car === undefined) p.car = null; },
       // v6 → v7: 건물(p.bldg) · 이벤트 등장인물 고정(p.ctx) · 첫사랑(p.firstLoveId)
-      6: p => { if (p.bldg === undefined) p.bldg = null; if (p.ctx === undefined) p.ctx = null; if (p.firstLoveId === undefined) p.firstLoveId = null; }
+      6: p => { if (p.bldg === undefined) p.bldg = null; if (p.ctx === undefined) p.ctx = null; if (p.firstLoveId === undefined) p.firstLoveId = null; },
+      // v7 → v8: 대출을 종류별로(p.loans) · 투자용 부동산(p.prop) · 리츠(p.inv.reit) · 부동산 시장
+      7: p => {
+        if (p.prop === undefined) p.prop = null;
+        if (p.inv && p.inv.reit === undefined) p.inv.reit = 0;
+        if (!Array.isArray(p.loans)) {
+          p.loans = [];
+          let d = Math.max(0, p.debt || 0);
+          const put = (k, a, left, rate) => { a = Math.round(a); if (a > 0) { p.loans.push({ k, amt: a, left, rate, late: 0 }); d -= a; } };
+          if (p.house && d > 0) put('mortgage', Math.min(d, p.house.value * 0.7), 25, 0.042);
+          if (p.flags && p.flags.student_loan !== undefined && p.age < 40 && d > 0) put('student', Math.min(d, 2500), 8, 0.017);
+          if (d > 0) put('credit', d, 3, 0.09);
+        }
+      }
     },
     migrate(p) {
       if (!p || typeof p !== 'object') return null;
@@ -199,10 +214,11 @@
         else if (n.role === 'sibling') parts.push([n.rel, 0.6]);
       });
       if (!parts.length) return 25;
-      const wsum = parts.reduce((a, x) => a + x[1], 0);
-      const avg = parts.reduce((a, x) => a + x[0] * x[1], 0) / wsum;
-      const breadth = Math.min(12, wsum * 2.2); // 사람이 많을수록 약간 보정
-      return U.clamp(Math.round(avg * 0.85 + breadth), 0, 100);
+      // 좋은 관계는 쌓일수록 점수가 오르고(포화), 틀어진 관계만 점수를 깎는다.
+      // (예전처럼 '평균'을 내면 새 연인·새 친구가 생길 때 오히려 관계 점수가 떨어지는 문제가 있었다)
+      const good = Math.max(0, parts.reduce((a, [r, w]) => a + (r > 45 ? w * (r - 45) / 55 : 0), 0));
+      const bad = parts.reduce((a, [r, w]) => a + (r < 45 ? w * (45 - r) / 45 : 0), 0);
+      return U.clamp(Math.round(30 + 68 * (1 - Math.exp(-good / 1.8)) - bad * 6), 0, 100);
     },
 
     relLabel(p) {

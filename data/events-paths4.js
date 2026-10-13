@@ -144,7 +144,7 @@
       { id: 'smart', label: '스마트팜 사업에 지원한다', intent: 'adventure',
         check: { base: 34, partial: 0.5, f: [['stat', 'intelligence', 0.25], ['assets', 0.2], ['eff', 'work', 0.2], ['flag', 'agri_path', 6, '농업 전공·경험']] },
         out: {
-          success: { t: '선정되었다! 첨단 시설에서 딸기를 키우며 수확량이 쑥쑥 늘었다.', log: '스마트팜 청년 농업인', major: true, flag: 'smart_farm', job: 'farmer', money: 800, debt: 1500, achv: 4, hp: 12 },
+          success: { t: '선정되었다! 첨단 시설에서 딸기를 키우며 수확량이 쑥쑥 늘었다.', log: '스마트팜 청년 농업인', major: true, flag: 'smart_farm', job: 'farmer', money: 800, debt: 1500, debtKind: 'biz', achv: 4, hp: 12 },
           partial: { t: '탈락했지만 정착지원금은 받게 되었다. 작게 시작하기로 했다.', flag: 'returned_farm', money: 300, hp: 4 },
           fail: { t: '서류에서 탈락했다. 농지를 구하는 길이 쉽지 않다.', hp: -5, sr: 6 }
         } },

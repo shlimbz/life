@@ -24,6 +24,8 @@
       <div class="ev-top"><span class="ev-age">${p.age}세 · ${p.year}년</span><span class="ev-kicker">${esc(ev.icon || '')} ${esc(ev.label || '')}</span></div>
       <h2 class="ev-title">${esc(render(p, ev.title))}</h2>
       <p class="ev-text">${esc(render(p, ev.text))}</p>
+      ${(() => { let fx = null; try { fx = typeof ev.facts === 'function' ? ev.facts(p) : null; } catch (e) { fx = null; }
+        return fx && fx.length ? `<dl class="ev-facts">${fx.map(f => `<div class="${f.tone || ''}"><dt>${esc(f.k)}</dt><dd>${esc(f.v)}</dd></div>`).join('')}</dl>` : ''; })()}
       <div class="choices">${opts.map(o => `
         <button class="choice" data-id="${esc(o.c.id)}" type="button">
           <span class="lbl">${esc(render(p, o.c.label))}</span>
@@ -34,7 +36,7 @@
         <div class="why-row"><b>${esc(render(p, o.c.label))}</b>${o.prob.factors.slice(0, 5).map(f => `<span class="f-chip ${f.v > 0 ? 'pos' : 'neg'}">${f.v > 0 ? '▲' : '▼'} ${esc(f.label)}</span>`).join('') || '<span class="f-chip">특별한 요인 없음</span>'}</div>`).join('')}</div>` : ''}
     `;
     layer.classList.remove('hidden');
-    $('#stage').classList.add('has-event');
+    $('#stage').classList.add('has-event'); document.body.classList.add('ev-open');
     card.scrollTop = 0;
     // 되돌릴 수 없는 중요한 선택은 한 번 더 눌러야 확정된다 (실수 방지)
     const confirmOn = LG.Storage.prefs().confirm !== false;
@@ -77,7 +79,7 @@
     if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) { /* 무시 */ }
     const res = LG.Game.choose(p, id);
     LG.Storage.save(p);
-    const label = render(p, res.choice.label);
+    const label = res.label || render(p, res.choice.label);
     const fast = st.speed > 1 ? 0.6 : 1;
     card.innerHTML = `<div class="ev-top"><span class="ev-age">${p.age}세</span><span class="ev-kicker">${esc(ev.icon || '')} ${esc(ev.label || '')}</span></div><div class="seq" id="seq"></div>`;
     const seq = card.querySelector('#seq');
@@ -108,7 +110,7 @@
 
     // 피드에도 기록, 현황 패널은 즉시 반영 (카드 뒤가 아니라 아래에 그대로 보인다)
     const block = yearBlock(p.age);
-    addLine(block, { t: p.history[p.history.length - 1].t, icon: ev.icon, choice: true, res: res.type !== 'done' ? res.type : null });
+    addLine(block, { t: p.history[p.history.length - 1].t, fx: res.fx, icon: ev.icon, choice: true, res: res.type !== 'done' ? res.type : null });
     updateHUD();
 
     next.addEventListener('click', () => {
@@ -120,7 +122,7 @@
   function closeEvent() {
     let p = K.p;
     $('#event').classList.add('hidden');
-    $('#stage').classList.remove('has-event');
+    $('#stage').classList.remove('has-event'); document.body.classList.remove('ev-open');
     st.eventOpen = false;
     trimFeed();
     saveNow();
@@ -128,5 +130,30 @@
     schedule(LG.Game.yearDelay(p.age) / st.speed);
   }
 
-  Object.assign(K, { openEvent, choose, closeEvent });
+  // 알림 카드: 선택은 없지만 놓치면 안 되는 큰 사건 (무엇이 얼마나 바뀌었는지 함께 보여 준다)
+  function openNotice(cards, done) {
+    const p = K.p;
+    clearTimeout(st.timer);
+    st.eventOpen = true;
+    const layer = $('#event'), card = $('#event-card');
+    const c = cards[0];
+    const hd = (c.deltas || []).find(d => d.k === 'happy');
+    const glad = hd ? hd.d > 0 : (c.deltas || []).some(d => d.good) && !(c.deltas || []).some(d => !d.good && d.k !== 'money');
+    card.innerHTML = `
+      <div class="ev-top"><span class="ev-age">${p.age}세 · ${p.year}년</span><span class="ev-kicker">${esc(c.icon || '❗')} ${glad ? '기쁜 일' : '큰일'}</span></div>
+      <h2 class="ev-title">${esc(c.title)}</h2>
+      <p class="ev-text">${esc(c.text)}</p>
+      ${c.deltas && c.deltas.length ? `<div class="deltas">${c.deltas.map(d => `<span class="delta ${d.good ? 'good' : 'bad'}">${d.icon} ${esc(d.label)} ${esc(d.text)}</span>`).join('')}</div>` : ''}
+      <button class="ev-next" type="button">${cards.length > 1 ? '다음' : glad ? '계속 살아가기' : '받아들이고 계속 살아가기'}</button>`;
+    layer.classList.remove('hidden');
+    $('#stage').classList.add('has-event'); document.body.classList.add('ev-open');
+    card.scrollTop = 0;
+    card.querySelector('.ev-next').addEventListener('click', () => {
+      if (cards.length > 1) return openNotice(cards.slice(1), done);
+      layer.classList.add('hidden'); $('#stage').classList.remove('has-event'); document.body.classList.remove('ev-open'); st.eventOpen = false;
+      done();
+    }, { once: true });
+  }
+
+  Object.assign(K, { openNotice, openEvent, choose, closeEvent });
 })(window.LG = window.LG || {});

@@ -79,6 +79,12 @@ for (let i = 0; i < N; i++) {
     let g = 0;
     while (p.alive && g++ < 130) {
       LG.Game.advance(p);
+      // 빚 장부: p.debt == 대출 합계, 음수 없음, 정기 대출이 3년 넘게 연체된 채 방치되지 않음, 갖고 있지 않은 부동산의 대출 없음
+      if (Math.abs(LG.Loans.sum(p) - p.debt) > 1) audit('빚 합계와 대출 장부가 다름');
+      if ((p.loans || []).some(l => l.amt < 0)) audit('음수 대출');
+      if ((p.loans || []).some(l => ['install', 'biz', 'student', 'prop'].indexOf(l.k) >= 0 && l.late >= 3)) audit('정기 대출 연체가 방치됨');
+      if (!p.prop && LG.Loans.amount(p, 'deposit') > 0) audit('투자 부동산이 없는데 세입자 보증금이 남음');
+      if (p.age < 19 && p.debt > 0 && !p.flags.young_carer) audit('미성년자가 빚을 짐');
       let ev = LG.Game.pendingEvent(p), k = 0;
       while (ev && k++ < 20) {
         const v = LG.Events.visibleChoices(p, ev);
@@ -107,7 +113,7 @@ ek.length ? ek.forEach(k => bad(`${errs[k]}회: ${k}`)) : ok(`${N}판 모두 오
 
 console.log('8. 인물·가족 정합성 (시뮬레이션 중 감시)');
 const ak = Object.keys(audits);
-ak.length ? ak.forEach(k => bad(`${audits[k]}회: ${k}`)) : ok('재회=같은 인물 · 청혼 후 이름 유지 · 성별에 맞는 임신 대사 · 이혼 후 다툼 이벤트 없음 · childfree 오기록 없음');
+ak.length ? ak.forEach(k => bad(`${audits[k]}회: ${k}`)) : ok('재회=같은 인물 · 청혼 후 이름 유지 · 성별에 맞는 임신 대사 · 이혼 후 다툼 이벤트 없음 · childfree 오기록 없음 · 빚 장부 일치');
 
 console.log('7. 옛 저장 데이터 불러오기 (v1 → 현재)');
 try {

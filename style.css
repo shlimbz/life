@@ -159,6 +159,8 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .yr-lines { display: flex; flex-direction: column; gap: 3px; }
 .ln { font-size: 15px; color: var(--ink-2); display: flex; gap: 6px; line-height: 1.42; animation: rise .35s var(--ease); }
 .ln .i { flex: none; width: 20px; text-align: center; }
+.ln em.fx, .log-item em.fx { font-style: normal; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.ln em.fx::before, .log-item em.fx::before { content: '('; } .ln em.fx::after, .log-item em.fx::after { content: ')'; }
 .ln.major { color: var(--ink); font-weight: 700; }
 .ln.flavor { color: var(--ink-3); }
 .ln.reflect { color: var(--accent); font-style: italic; }
@@ -215,6 +217,13 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .ev-kicker { font-size: 12.5px; font-weight: 700; letter-spacing: .04em; color: var(--paper-ink-2); }
 .ev-title { margin: 0 0 4px; font-size: 20px; line-height: 1.25; font-weight: 900; letter-spacing: -.03em; }
 .ev-text { margin: 0 0 10px; font-size: 14.5px; line-height: 1.55; color: #4a4050; }
+.ev-facts { margin: 0 0 10px; padding: 8px 10px; border-radius: 12px; background: #f6f1f8; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 12.5px; }
+.ev-facts > div { display: flex; gap: 6px; min-width: 0; }
+.ev-facts > div.wide { grid-column: 1 / -1; }
+.ev-facts dt { color: #8a7f93; flex: none; }
+.ev-facts dd { margin: 0; color: #3b3242; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.ev-facts > div.good dd { color: #1f8a5c; }
+.ev-facts > div.bad dd { color: #c24848; }
 .choices { display: flex; flex-direction: column; gap: 6px; }
 .choice {
   width: 100%; min-height: 48px; padding: 8px 12px; border-radius: 14px; text-align: left;
@@ -475,3 +484,29 @@ body.fs-xl .ev-text, body.fs-xl .res-text { font-size: 18.5px; }
 body.fs-xl .ev-title { font-size: 24px; }
 body.fs-xl .choice .lbl { font-size: 18px; }
 body.fs-xl .log-item, body.fs-xl .seq-step { font-size: 17px; }
+
+/* ───────── v8: 상단 버튼 라벨 · 보유 내역 · 선택 카드가 열렸을 때 공간 배분 ───────── */
+.hud-top { flex-wrap: wrap; row-gap: 6px; }
+.hud-ctrl { width: 100%; display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; order: 3; }
+.hud-ctrl .chip-btn.lb { width: auto; min-width: 0; height: 32px; padding: 0 2px; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 700; border-radius: 10px; }
+.hud-ctrl .chip-btn.lb i { font-style: normal; font-size: 13px; }
+.hud-ctrl .chip-btn.lb span { white-space: nowrap; letter-spacing: -.04em; font-size: 11.5px; }
+.d-money { grid-template-columns: 1.3fr 1fr; row-gap: 5px; }
+.mc.main b { font-size: 19px; }
+.mc span em { font-style: normal; font-size: 10px; opacity: .75; }
+.as-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.ah { font-size: 11px; padding: 2px 7px; border-radius: 7px; background: rgba(0, 0, 0, .22); color: var(--ink-2); white-space: nowrap; }
+.ah b { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ah.neg b { color: #ff9b9b; }
+button.d-bars { width: 100%; text-align: left; padding: 0; background: none; }
+/* 선택 카드가 열리면: 로그는 최소 4~5줄을 지키고, 카드는 남은 공간에서 스크롤, 아래 현황은 핵심만 */
+.stage.has-event .feed { flex: 1 1 0; min-height: clamp(112px, 30%, 220px); }
+.stage.has-event .event-dock { flex: 0 1 auto; max-height: calc(100% - clamp(120px, 31%, 228px)); }
+.stage.has-event .event-card { max-height: 100%; }
+body.ev-open .dash .d-bars, body.ev-open .dash .d-tags, body.ev-open .dash .d-chips, body.ev-open .dash .as-chips { display: none; }
+body.ev-open .dash { padding: 6px 10px; }
+/* 대출 종류별 목록 (v10) */
+.loans .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+.loans .row small { grid-column: 1 / -1; color: var(--ink-3); font-size: 12px; }
+.loans .row.bad b { color: var(--bad); }
+.loans em.late { font-style: normal; font-size: 11px; font-weight: 800; color: #fff; background: var(--bad); border-radius: 999px; padding: 1px 6px; margin-left: 4px; }

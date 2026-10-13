@@ -76,7 +76,6 @@
     p.styleChosen = true;
     p.styleLog = p.styleLog || [];
     p.styleLog.push({ a: p.age, k });
-    if (!quiet && prev && prev !== k) S().addStat(p, 'happy', -1);
     return true;
   }
   function canSwitch(p) { return p.age >= 19 && (p.age - (p.styleSince || 0) >= COOLDOWN || !p.styleChosen); }

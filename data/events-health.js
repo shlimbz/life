@@ -113,4 +113,24 @@
       { id: 'no', label: '그 돈으로 저축한다', intent: 'money', out: { t: '아플 때 쓰려고 따로 모으기로 했다. 아프지 않기를 바라면서.', flag: 'no_insurance' } }
     ]
   });
+
+  // ───── 큰 사고 뒤의 회복 ─────
+  ch({
+    id: 'hl_accident', queued: true, icon: '🩼', tier: 'choice',
+    title: '사고 이후', text: p => `퇴원은 했지만 몸이 예전 같지 않다. ${p.job ? '회사에서는 언제 복귀하냐고 묻는다.' : '재활 병원 상담 예약이 잡혀 있다.'} ${has(p, 'insured') ? '보험금 청구 서류가 책상 위에 쌓여 있다.' : '병원비 영수증이 쌓여 간다.'}`,
+    choices: [
+      { id: 'rehab', label: '재활에 시간을 쏟는다', intent: 'health',
+        check: { base: 55, partial: 0.4, f: [['stat', 'mental', 0.3], ['health', 0.2], ['stat', 'physical', 0.2], ['region', 'medical', 0.15]] },
+        out: { success: { t: '반년의 재활 끝에 다시 뛸 수 있게 됐다.', log: '사고를 딛고 회복', st: { health: 12, physical: 3 }, perf: -6, money: -200, hp: 8, flag: 'healed' },
+          partial: { t: '많이 좋아졌지만 비 오는 날이면 수술 자리가 쑤신다.', st: { health: 6 }, perf: -4, money: -200 },
+          fail: { t: '재활이 더뎠다. 오래 서 있기가 힘든 몸이 됐다.', st: { health: -4, physical: -4 }, hp: -8, money: -200 } } },
+      { id: 'back', label: '빨리 복귀해 일상을 되찾는다', intent: 'career', if: p => !!p.job,
+        out: { t: '목발을 짚고 출근했다. 일은 놓치지 않았지만 몸은 더디게 낫는다.', perf: 4, st: { health: -4 }, sr: 8 } },
+      { id: 'claim', label: '보험·합의금을 꼼꼼히 챙긴다', intent: 'money',
+        check: { base: 50, partial: 0.4, f: [['flag', 'insured', 25, '보험 가입'], ['stat', 'intelligence', 0.2]] },
+        out: { success: { t: '보험금과 합의금으로 병원비를 대부분 돌려받았다.', money: 1200, sr: 4 },
+          partial: { t: '일부만 받았다. 서류 싸움에 지쳤다.', money: 400, sr: 10 },
+          fail: { t: '가해자 측이 버텼다. 소송까지 갈지 고민 중이다.', sr: 14, hp: -4 } } }
+    ]
+  });
 })(window.LG = window.LG || {});

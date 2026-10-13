@@ -80,7 +80,7 @@
           partial: { t: '지적을 받아 논문을 수정해야 했다. 위태로운 순간이었다.', hp: -6, sr: 14 },
           fail: { t: '연구윤리 문제로 조사가 열렸다. 경력에 큰 오점이 남았다.', log: '연구부정 의혹으로 징계', major: true, perf: -20, hp: -18, sr: 22, flag: 'research_misconduct' }
         } },
-      { id: 'delay', label: '마감을 늦추고 실험을 더 한다', intent: 'education', out: { t: '시간을 더 들여 제대로 실험했다. 마감을 넘겼지만 결과는 더 단단해졌다.', hp: -2, sr: 8, perf: 2 } }
+      { id: 'delay', label: '마감을 늦추고 실험을 더 한다', intent: 'education', out: { t: '시간을 더 들여 제대로 실험했다. 마감을 넘겼지만 결과는 더 단단해졌다.', hp: 0, sr: 8, perf: 2 } }
     ]
   });
 
@@ -149,7 +149,7 @@
           partial: { t: '버티고 버텨 후속 투자를 받았다. 아직 성공이라 하긴 이르지만 계속 달린다.', log: '스타트업에서 분투', flag: 'startup_member', money: 200, achv: 2, sr: 14, hp: 4 },
           fail: { t: '자금이 바닥나 회사가 문을 닫았다. 지분은 휴지조각이 되었다. 하지만 쌓은 경험은 남았다.', log: '스타트업 실패', flag: 'startup_failed', money: -600, hp: -12, sr: 16, eff: { work: 10 } }
         } },
-      { id: 'stay', label: '안정적인 직장에 남는다', intent: 'stability', out: { t: '월급을 지키는 쪽을 택했다. 가끔 그 스타트업 소식이 신경 쓰인다.', hp: -1, perf: 2 } },
+      { id: 'stay', label: '안정적인 직장에 남는다', intent: 'stability', out: { t: '월급을 지키는 쪽을 택했다. 가끔 그 스타트업 소식이 신경 쓰인다.', hp: 0, perf: 2 } },
       { id: 'side', label: '퇴근 후에만 조금 돕는다', intent: 'career', out: { t: '두 일을 병행하느라 체력이 달리지만 어느 쪽도 놓치진 않았다.', flag: 'side_hustle', eff: { work: 4 }, sr: 10, money: 100 } }
     ]
   });
@@ -255,9 +255,9 @@
       { id: 'expand', label: '대출을 받아 확장한다', intent: 'risk',
         check: { base: 34, partial: 0.5, f: [['stat', 'intelligence', 0.15], ['talent', 'entrepreneur', 12], ['assets', 0.2], ['jobYears', 0.5, 8]] },
         out: {
-          success: { t: '2호점도 자리를 잡았다. 직원 몇 명을 둔 어엿한 사장이 되었다.', log: '사업 확장 성공', major: true, flag: 'bz_expanded', money: 1500, debt: 800, achv: 5, hp: 12 },
-          partial: { t: '1호점이 흔들릴 만큼 힘들었지만 간신히 버텨 냈다.', debt: 800, money: 200, sr: 16, hp: -2 },
-          fail: { t: '경기가 꺾이며 2호점이 적자의 늪이 되었다. 결국 정리했지만 빚이 남았다.', log: '확장 실패로 빚을 짐', major: true, debt: 2500, hp: -16, sr: 20, flag: 'bz_failed' }
+          success: { t: '2호점도 자리를 잡았다. 직원 몇 명을 둔 어엿한 사장이 되었다.', log: '사업 확장 성공', major: true, flag: 'bz_expanded', money: 1500, debt: 800, debtKind: 'biz', achv: 5, hp: 12 },
+          partial: { t: '1호점이 흔들릴 만큼 힘들었지만 간신히 버텨 냈다.', debt: 800, debtKind: 'biz', money: 200, sr: 16, hp: -2 },
+          fail: { t: '경기가 꺾이며 2호점이 적자의 늪이 되었다. 결국 정리했지만 빚이 남았다.', log: '확장 실패로 빚을 짐', major: true, debt: 2500, debtKind: 'biz', hp: -16, sr: 20, flag: 'bz_failed' }
         } },
       { id: 'steady', label: '지금 가게를 단단히 지킨다', intent: 'stability', out: { t: '무리하지 않고 품질에 집중했다. 단골은 더 늘었다.', money: 400, hp: 4, sr: -3 } },
       { id: 'franchise', label: '기술·노하우를 다른 사람에게 가르친다', intent: 'career', out: { t: '컨설팅·교육으로 노하우를 나눴다. 새로운 수익원이 생겼다.', money: 500, hp: 5, st: { social: 2 } } }

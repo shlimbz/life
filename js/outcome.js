@@ -29,8 +29,19 @@
     if (eff.st) Object.keys(eff.st).forEach(k => add(k, eff.st[k]));
     if (eff.hp) add('happy', eff.hp);
     if (eff.sr) add('stress', eff.sr);
-    if (eff.money) p.money += eff.money;
-    if (eff.debt) p.debt = Math.max(0, p.debt + eff.debt);
+    // 미성년자의 큰 지출(병원비·피해 보상 등)은 부모님이 감당한다 — 소년소녀가장이 아니라면 아이가 빚을 지지 않는다
+    const shield = p.age < 19 && !S().youngCarer(p);
+    let covered = 0;
+    if (eff.money) {
+      if (shield && eff.money < 0) { const own = Math.min(Math.max(0, p.money) * 0.3, -eff.money); p.money -= Math.round(own); covered += -eff.money - own; }
+      else p.money += eff.money;
+    }
+    if (eff.debt) {
+      if (shield && eff.debt > 0) covered += eff.debt;
+      else if (eff.debt > 0) LG.Loans.add(p, eff.debtKind || 'credit', eff.debt);   // 어떤 빚인지(debtKind)에 따라 금리·상환이 다르다
+      else LG.Loans.pay(p, -eff.debt);
+    }
+    if (covered >= 50) extra += ` (${U().money(Math.round(covered / 10) * 10)}원은 부모님이 감당하셨다)`;
     if (eff.eff) Object.keys(eff.eff).forEach(k => { p.effort[k] = U().clamp((p.effort[k] || 0) + eff.eff[k], 0, 100); });
     if (eff.rel) Object.keys(eff.rel).forEach(k => LG.Rel.adjust(p, k, eff.rel[k]));
     if (eff.flag) [].concat(eff.flag).forEach(f => S().flag(p, f));
@@ -60,6 +71,7 @@
       if (typeof r === 'string') extra += ' ' + r;
     }
     if (p.money < 0 && LG.Invest) LG.Invest.raise(p, -p.money);
+    if (shield && p.money < 0) p.money = 0;
     return extra.trim();
   }
 
@@ -72,7 +84,7 @@
   }
 
   const DELTA_META = {
-    money: { icon: '💰', label: '자산' }, health: { icon: '❤️', label: '건강' }, happy: { icon: '😊', label: '행복' },
+    money: { icon: '💰', label: '순자산' }, health: { icon: '❤️', label: '건강' }, happy: { icon: '😊', label: '행복' },
     stress: { icon: '😣', label: '스트레스', invert: true }, rel: { icon: '🤝', label: '관계' },
     intelligence: { icon: '🧠', label: '학습능력' }, social: { icon: '🗣️', label: '사교성' }, physical: { icon: '💪', label: '운동능력' },
     creativity: { icon: '🎨', label: '창의력' }, mental: { icon: '🧘', label: '정신력' }
@@ -90,5 +102,12 @@
     return out;
   }
 
-  LG.Outcome = { apply, setJob, quitJob, snapshot, diff };
+  // 로그 한 줄에 붙이는 짧은 숫자 요약: "행복 +8 · 순자산 +15억"
+  const ORDER = ['happy', 'money', 'health', 'stress', 'rel', 'mental', 'social', 'intelligence', 'physical', 'creativity'];
+  function fxText(deltas, max) {
+    if (!deltas || !deltas.length) return '';
+    return deltas.slice().sort((a, b) => ORDER.indexOf(a.k) - ORDER.indexOf(b.k)).slice(0, max || 4).map(d => `${d.label} ${d.text}`).join(' · ');
+  }
+
+  LG.Outcome = { apply, setJob, quitJob, snapshot, diff, fxText };
 })(window.LG = window.LG || {});

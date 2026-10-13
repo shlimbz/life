@@ -139,7 +139,7 @@
     out: { success: { t: '성적 장학금을 받았다. 등록금 걱정을 덜었다.', log: '장학금 수혜', flag: 'scholarship', hp: 8 }, fail: { skip: true } } });
 
   // 우연한 만남 — 선택이 아니라 타인과 우연이 만드는 인연
-  auto({ id: 'a_meet_naturally', cat: 'relationship', ages: [21, 45], w: 4, cd: 3, icon: '☂️',
+  auto({ id: 'a_meet_naturally', cat: 'relationship', ages: [21, 45], w: 4, cd: 3, icon: '☂️', card: true, title: '새로운 인연',
     if: p => H.single(p) && p.status !== 'military',
     check: { base: 40, f: [['stat', 'social', 0.4], ['happy', 0.2], ['trait', 'extrovert', 6]] },
     out: { success: { t: '비 오는 날 우산을 같이 쓴 것이 인연이 되어 {partner}와(과) 만나기 시작했다.', log: '{partner}와 우연히 만나 연애 시작', major: true, hp: 10, fn: H.lover() }, fail: { skip: true } } });
@@ -152,9 +152,9 @@
     if: p => LG.Rel.all(p, 'friend').length > 0,
     auto: { t: '{friend}의 결혼식에서 축가를 불렀다.', rel: { friends: 4 }, hp: 3 } });
 
-  auto({ id: 'a_pet_bye', cat: 'family', ages: [16, 30], w: p => has(p, 'pet') && p.age - p.flags.pet >= 11 ? 20 : 0, max: 1, icon: '🌈',
+  auto({ id: 'a_pet_bye', cat: 'family', ages: [8, 35], w: p => has(p, 'pet') && p.age - p.flags.pet >= ({ 햄스터: 3, 고양이: 14 }[(p.pet || {}).kind] || 11) ? 20 : 0, max: 1, icon: '🌈',
     if: p => has(p, 'pet'),
-    auto: { t: '콩이가 무지개다리를 건넜다. 한참을 울었다.', log: '반려견 콩이와 이별', major: true, hp: -12, unflag: 'pet' } });
+    auto: { t: p => `${(p.pet || { name: '콩이' }).name}이(가) 무지개다리를 건넜다. 한참을 울었다.`, log: p => `${(p.pet || { kind: '반려견' }).kind} ${(p.pet || { name: '콩이' }).name}과(와) 이별`, major: true, hp: -12, unflag: 'pet' } });
 
   auto({ id: 'a_bonus', cat: 'money', ages: [24, 62], w: 3, cd: 5, max: 4, icon: '💵',
     if: p => !!p.job && ['office_big', 'developer', 'researcher', 'office_small', 'technician', 'lawyer', 'doctor'].indexOf(p.job.id) >= 0,
@@ -178,22 +178,36 @@
     child: p => H.kids(p).find(c => c.age >= 22 && c.age <= 35 && c.rel >= 60),
     auto: { t: '{child}이(가) 첫 월급으로 용돈을 보내왔다. 괜히 눈물이 났다.', hp: 10, rel: { children: 4 } } });
 
-  auto({ id: 'a_accident', cat: 'accident', ages: [16, 85], w: 1.2, cd: 12, icon: '🚑',
-    check: { base: 70, partial: 0.5, f: [['fn', p => p.age > 70 ? { label: '나이', v: -(p.age - 70) } : null]] },
+  // 사고 — 크게 다치면 그해 '회복을 어떻게 할지' 선택(hl_accident)이 이어진다
+  auto({ id: 'a_accident', cat: 'accident', ages: [16, 85], rate: p => 0.012 + (p.age > 70 ? 0.008 : 0), cd: 12, icon: '🚑', card: true, title: '사고',
+    check: { base: 70, partial: 0.5, f: [['fn', p => p.age > 70 ? { label: '나이', v: -(p.age - 70) } : null], ['stat', 'physical', 0.15]] },
     out: {
-      success: { t: p => LG.RNG.pick(p, ['접촉 사고가 났다. 크게 다치진 않았다.', '빗길에 미끄러져 넘어졌다. 멍이 든 정도로 끝났다.', '자전거(혹은 차)로 가다 아찔한 순간이 있었다. 다치진 않았지만 한동안 가슴이 뛰었다.']), st: { health: -3 }, sr: 4 },
-      partial: { t: '빙판길에 넘어져 다리가 부러졌다. 석 달을 깁스로 지냈다.', st: { health: -8 }, money: -150 },
-      fail: { t: '당신의 선택과 상관없이, 사고는 예고 없이 찾아왔다. 몇 달을 병원에서 보냈다.', log: '큰 사고를 당함', major: true, st: { health: -18 }, money: -800, hp: -10, flag: 'injured' }
+      success: { t: p => LG.RNG.pick(p, ['접촉 사고가 났다. 크게 다치진 않았지만 목과 허리가 한동안 뻐근했다.', '빗길에 미끄러져 넘어졌다. 멍이 든 정도로 끝났다.', '횡단보도에서 아찔한 순간이 있었다. 다치진 않았지만 한동안 가슴이 뛰었다.']), st: { health: -3 }, sr: 4, hp: -2 },
+      partial: { t: '빙판길에 넘어져 다리가 부러졌다. 석 달을 깁스로 지냈다. 출퇴근도, 집안일도 남의 손을 빌려야 했다.', log: '골절 사고', major: true, st: { health: -8, physical: -2 }, money: -150, hp: -6, sr: 5 },
+      fail: { t: '교통사고로 크게 다쳤다. 수술을 두 번 받고 몇 달을 병원에서 보냈다.', log: '큰 교통사고', major: true, st: { health: -18, physical: -4 }, money: -800, hp: -14, sr: 12, flag: 'injured', next: 'hl_accident' }
     } });
 
-  auto({ id: 'a_disaster', cat: 'crisis', ages: [10, 90], w: 0.35, max: 1, icon: '🌀',
+  auto({ id: 'a_disaster', cat: 'crisis', ages: [10, 90], rate: 0.004, max: 1, icon: '🌀', card: true, title: '태풍',
     auto: { t: '큰 태풍이 지나갔다. 동네가 물에 잠겼다. 아무도 피할 수 없는 일이었다.', log: '태풍 피해', major: true, money: -500, hp: -8 } });
 
-  // 희귀 사건 — 매우 낮은 확률
-  auto({ id: 'a_lottery', cat: 'opportunity', ages: [20, 85], w: 0.12, max: 1, icon: '🎰',
-    auto: { t: '심심풀이로 산 복권이… 1등에 당첨됐다!', log: '복권 1등 당첨', major: true, money: 15000, hp: 18 } });
+  // 로또 1등 — 실제 1등 당첨금은 회차마다 다르지만 세후 십수억 원대. 당첨 직후 '이 돈을 어떻게 할지'를 고른다(m_lottery)
+  auto({ id: 'a_lottery', cat: 'opportunity', ages: [20, 85], rate: 0.0005, max: 1, icon: '🎰', card: true, title: '로또 1등',
+    auto: { t: '', log: '로또 1등 당첨', major: true, hp: 20, next: 'm_lottery', fn: p => { const v = Math.round(LG.RNG.float(p, 11, 24)) * 10000; p.money += v; p.lotto = v; return `토요일 밤, 번호 여섯 개가 모두 맞았다. 세금을 떼고 ${LG.U.money(v)}원. 손이 떨려 한참을 앉아 있었다.`; } } });
 
-  auto({ id: 'a_inherit_rare', cat: 'opportunity', ages: [30, 75], w: 0.2, max: 1, icon: '✉️',
+  // 로또 2·3·4등 — 1등보다 훨씬 흔한 '작은 당첨'. 등수에 따라 금액과 기쁨이 다르다 (실제 평균 당첨금 기준: 2등 5~8천만, 3등 150만, 4등 5만)
+  auto({ id: 'a_lotto_2nd', cat: 'opportunity', ages: [20, 85], rate: 0.0008, max: 1, icon: '🎟️', card: true, title: '로또 2등',
+    auto: { t: '', log: p => `로또 2등 당첨 (+${LG.U.money(p.lotto2 || 0)}원)`, major: true, hp: 10, sr: -3, fn: p => { const v = LG.RNG.int(p, 50, 80) * 100; p.money += v; p.lotto2 = v; return `번호 다섯 개와 보너스 번호가 맞았다. 로또 2등, 세금을 떼고 ${LG.U.money(v)}원! 1등은 아니어도 심장이 한참 뛰었다.`; } } });
+  auto({ id: 'a_lotto_small', cat: 'opportunity', ages: [20, 85], rate: 0.012, max: 4, cd: 3, icon: '🎟️',
+    auto: { t: '', fn: p => {
+      if (LG.RNG.chance(p, 0.3)) { const v = LG.RNG.int(p, 120, 170); p.money += v; LG.State.addStat(p, 'happy', 4); return `로또 3등에 당첨됐다. ${LG.U.money(v)}원. 큰돈은 아니지만 일주일 내내 기분이 좋았다.`; }
+      p.money += 5; LG.State.addStat(p, 'happy', 1); return '로또 4등, 5만 원. 다음 주 복권 값이 생겼다.';
+    } } });
+
+  // 즉석복권·연금복권 같은 작은 행운
+  auto({ id: 'a_scratch', cat: 'opportunity', ages: [20, 85], rate: 0.004, max: 2, icon: '🎫',
+    auto: { t: p => { const v = LG.RNG.pick(p, [500, 1000, 2000]); p.money += v; return `편의점에서 긁은 즉석복권이 ${LG.U.money(v)}원에 당첨됐다. 오늘 저녁은 내가 쏜다.`; }, hp: 8 } });
+
+  auto({ id: 'a_inherit_rare', cat: 'opportunity', ages: [30, 75], rate: 0.0015, max: 1, icon: '✉️', card: true,
     if: p => p.family.tier <= 3,
     auto: { t: '연락이 끊겼던 먼 친척이 재산을 남겼다는 편지가 왔다.', log: '뜻밖의 상속', major: true, money: 5000, hp: 8 } });
 

@@ -102,17 +102,18 @@
   });
 
   E.push({
-    id: 'c_pet', cat: 'family', tier: 'choice', ages: [6, 12], w: 6, icon: '🐶',
-    label: '가족', title: '강아지를 키우고 싶어',
-    text: '친구네 강아지를 보고 온 뒤로 머릿속이 강아지 생각뿐이다.',
+    // 반려동물: 한 판에 약 10~15%만 만난다. 종류와 이름은 인생마다 다르다
+    id: 'c_pet', cat: 'family', tier: 'choice', ages: [6, 12], w: 4, max: 1, icon: '🐾',
+    label: '가족', title: p => `${pet(p).kind}를 키우고 싶어`,
+    text: p => `친구네 ${pet(p).kind}를 보고 온 뒤로 머릿속이 ${pet(p).kind} 생각뿐이다.`,
     choices: [
       { id: 'beg', label: '부모님을 조른다', intent: 'family',
         check: { base: 38, partial: 0, f: [['family', 0.5], ['support', 0.35], ['fn', p => !p.urban ? { label: '마당 있는 집', v: 15 } : null]] },
         out: {
-          success: { t: '강아지 "콩이"가 가족이 되었다. 매일 아침이 신난다.', log: '반려견 콩이가 가족이 됨', flag: 'pet', hp: 12, rel: { parents: 3 }, st: { mental: 2 } },
+          success: { t: p => `${pet(p).kind} "${pet(p).name}"이(가) 가족이 되었다. 매일 아침이 신난다.`, log: p => `${pet(p).kind} ${pet(p).name}이(가) 가족이 됨`, flag: 'pet', hp: 12, rel: { parents: 3 }, st: { mental: 2 } },
           fail: { t: '"누가 산책시킬 건데?" 안 된다는 대답만 돌아왔다.', hp: -4 }
         } },
-      { id: 'no', label: '꾹 참는다', intent: 'stability', out: { t: '대신 강아지 인형을 끌어안고 잤다.', minor: true } }
+      { id: 'no', label: '꾹 참는다', intent: 'stability', out: { t: p => `대신 ${pet(p).kind} 인형을 끌어안고 잤다.`, minor: true } }
     ]
   });
 
@@ -224,6 +225,12 @@
     n.age = p.age; n.note = '첫사랑'; p.firstLoveId = n.id;
     return '';
   };
+  // 반려동물 종류·이름 (시드로 한 번 정해진다)
+  const pet = p => {
+    if (!p.pet) { const kind = LG.RNG.weightedKey(p, { 강아지: 55, 고양이: 35, 햄스터: 10 }); p.pet = { kind, name: LG.RNG.pick(p, { 강아지: ['콩이', '보리', '두부', '초코', '까미'], 고양이: ['나비', '치즈', '모모', '레오'], 햄스터: ['쿠키', '도토리', '감자'] }[kind]) }; }
+    return p.pet;
+  };
+  LG.EH.pet = pet;
   E.push({
     id: 't_crush', cat: 'relationship', tier: 'choice', ages: [14, 18], w: 9, icon: '💌',
     if: p => !has(p, 'first_love'),

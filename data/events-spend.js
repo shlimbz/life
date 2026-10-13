@@ -10,7 +10,8 @@
   const style = p => LG.Style && LG.Style.active(p) ? LG.Style.key(p) : 'balanced';
   const styleW = p => ({ luxury: 1.8, frugal: 0.5 })[style(p)] || 1;
   // 할부·대출: 원금 + 이자(대략)를 빚으로 잡는다
-  const loan = (amt, rate) => p => { const d = Math.round(amt * (1 + (rate || 0.08))); p.debt += d; return `${M(d)}원을 할부(대출)로 갚아 나가기로 했다.`; };
+  // 할부·대출: 종류에 따라 금리와 기간이 다르다 (js/loans.js). 이자는 해마다 따로 붙는다
+  const loan = (amt, rate, kind) => p => { const d = Math.round(amt); LG.Loans.add(p, kind || 'install', d); const K = LG.Loans.KINDS[kind || 'install']; return `${M(d)}원을 ${K.name}(연 ${(K.rate * 100).toFixed(1)}%)로 갚아 나가기로 했다.`; };
   const pay = amt => p => { p.money -= amt; return ''; };
   const buyCar = (label, value) => p => { p.car = { label, value, at: p.age }; return ''; };
 
@@ -91,7 +92,7 @@
     choices: [
       { id: 'full', label: '전체 리모델링을 한다', intent: 'family', if: p => cash(p) >= 3000,
         out: { t: '두 달 공사 끝에 새집 같아졌다. 집값도 조금 올랐다.', log: '집 리모델링', hp: 10, money: -3000, fn: p => { p.house.value = Math.round(p.house.value + 2200); return ''; } } },
-      { id: 'loan', label: '대출을 받아 리모델링한다', intent: 'risk', out: { t: '', log: '대출로 집 리모델링', hp: 8, sr: 4, fn: H.seq(loan(3000, 0.07), p => { p.house.value = Math.round(p.house.value + 2200); return '대출은 늘었지만 살기 좋아졌다.'; }) } },
+      { id: 'loan', label: '대출을 받아 리모델링한다', intent: 'risk', out: { t: '', log: '대출로 집 리모델링', hp: 8, sr: 4, fn: H.seq(loan(3000, 0.07, 'mortgage'), p => { p.house.value = Math.round(p.house.value + 2200); return '대출은 늘었지만 살기 좋아졌다.'; }) } },
       { id: 'part', label: '새는 곳만 고친다', intent: 'money', out: { t: '급한 곳만 고쳤다. 나머지는 다음에.', money: -500, hp: 2 } },
       { id: 'later', label: '버틸 수 있을 때까지 미룬다', intent: 'stability', out: { t: '양동이를 받쳐 두었다. 집값이 조금 떨어졌다는 얘기가 들린다.', sr: 6, fn: p => { p.house.value = Math.round(p.house.value * 0.96); return ''; } } }
     ]
@@ -103,7 +104,7 @@
     if: p => LG.Rel.parents(p).some(n => n.alive && n.health < 50) && p.age >= 35,
     title: '부모님 수술비', text: p => `{parent}가 큰 수술을 받아야 한다. 수술비와 간병비를 합치면 2,000만 원 가까이 든다. ${LG.Rel.get(p, 'sibling') ? '형제들과 어떻게 나눌지도 문제다.' : '외동인 내가 감당해야 한다.'}`,
     choices: [
-      { id: 'all', label: '내가 전부 부담한다', intent: 'family', out: { t: '', log: '부모님 병원비를 전부 부담', rel: { parents: 14 }, hp: 2, sr: 8, fn: p => { const own = Math.min(cash(p), 2000); p.money -= own; return own < 2000 ? '모아 둔 돈이 모자라 ' + loan(2000 - own, 0.06)(p) : '모아 둔 돈을 털었다. 아깝지 않았다.'; } } },
+      { id: 'all', label: '내가 전부 부담한다', intent: 'family', out: { t: '', log: '부모님 병원비를 전부 부담', rel: { parents: 14 }, hp: 2, sr: 8, fn: p => { const own = Math.min(cash(p), 2000); p.money -= own; return own < 2000 ? '모아 둔 돈이 모자라 ' + loan(2000 - own, 0.06, 'credit')(p) : '모아 둔 돈을 털었다. 아깝지 않았다.'; } } },
       { id: 'split', label: '형제들과 나눠 낸다', intent: 'stability', if: p => !!LG.Rel.get(p, 'sibling'),
         check: { base: 52, partial: 0, f: [['rel', 'sibling', 0.4], ['stat', 'social', 0.15]] },
         out: { success: { t: '형제들이 흔쾌히 나눠 냈다. 오랜만에 한마음이 됐다.', rel: { siblings: 8, parents: 8 }, money: -700, hp: 4 },
@@ -120,8 +121,36 @@
     choices: [
       { id: 'buy', label: '나에게 주는 선물, 산다', intent: 'rest', if: p => cash(p) >= 800,
         out: { t: '며칠 동안 기분이 좋았다. 이런 게 사는 재미다.', hp: 10, money: -800, sr: -6 } },
-      { id: 'install', label: '할부로 지른다', intent: 'risk', out: { t: '', hp: 9, sr: 3, fn: loan(800, 0.12) } },
-      { id: 'no', label: '참는다, 그 돈은 모은다', intent: 'money', out: { t: '장바구니에서 지웠다. 통장 잔고를 보며 조용히 뿌듯했다.', hp: -2, eff: { work: 3 } } }
+      { id: 'install', label: '할부로 지른다', intent: 'risk', out: { t: '', hp: 9, sr: 3, fn: loan(800, 0.12, 'credit') } },
+      { id: 'no', label: '참는다, 그 돈은 모은다', intent: 'money', out: { t: '장바구니에서 지웠다. 통장 잔고를 보며 조용히 뿌듯했다.', hp: 1, eff: { work: 3 } } }
+    ]
+  });
+
+  // ───── 로또 1등, 그다음 ─────
+  ch({
+    id: 'm_lottery', queued: true, tier: 'major', cat: 'money', label: '로또', icon: '🎰', max: 1,
+    title: '이 돈을 어떻게 할까', text: p => `당첨금 ${M(p.lotto || 0)}원이 통장에 들어왔다. 은행 직원이 "당분간 아무에게도 말하지 마세요"라고 했다.`,
+    choices: [
+      { id: 'quiet', label: '아무에게도 말하지 않고, 빚부터 갚고 예금에 넣는다', intent: 'stability',
+        out: { t: '', log: '당첨금을 조용히 지킴', hp: 6, sr: -10, fn: p => { const d = LG.Loans.pay(p, Math.min(p.debt, p.money)); p.money -= d; LG.Invest.setPolicy(p, p.invPolicy && p.invPolicy !== 'cash' ? p.invPolicy : 'balanced', true); return '빚을 모두 갚고 나머지는 나눠서 굴리기로 했다. 겉으로는 아무것도 바뀌지 않았다.'; } } },
+      { id: 'house', label: '내 집부터 산다', intent: 'family', if: p => !p.house && p.liveIn !== 'abroad',
+        out: { t: '', log: '당첨금으로 집 마련', hp: 12, fn: p => { const price = LG.EH.housePrice ? LG.EH.housePrice(p) : 60000; p.money -= price; p.house = { value: price, label: LG.State.liveRegion(p).short + ' 아파트' }; p.home = 'own'; LG.State.flag(p, 'home_owner'); return `${M(price)}원짜리 아파트를 대출 없이 샀다.`; } } },
+      { id: 'quit', label: '회사를 그만두고 하고 싶은 걸 한다', intent: 'rest', if: p => !!p.job,
+        out: { t: '사직서를 냈다. 동료들은 이유를 끝까지 몰랐다.', log: '로또 당첨 후 퇴사', quit: 'idle', flag: 'rich_idle', hp: 10, sr: -20, queue: [{ id: 'al_idle_life', in: 3 }] } },
+      { id: 'share', label: '가족들과 나눈다', intent: 'family',
+        out: { t: '', log: '당첨금을 가족과 나눔', rel: { family: 14, parents: 10, siblings: 8 }, hp: 10, fn: p => { const g = Math.round((p.lotto || 0) * 0.3); p.money -= g; return `${M(g)}원을 부모님과 형제들에게 나눴다. 명절 분위기가 달라졌다. 다만 연락이 끊겼던 친척들의 전화가 늘었다.`; } } },
+      { id: 'spend', label: '인생은 한 번뿐, 마음껏 쓴다', intent: 'risk',
+        out: { t: '수입차, 명품, 해외여행. 처음 1년은 꿈 같았다.', log: '당첨금으로 마음껏 씀', hp: 16, fn: p => { p.money -= Math.round((p.lotto || 0) * 0.45); p.queue.push({ id: 'm_lottery_after', at: p.age + 4 }); return ''; } } }
+    ]
+  });
+  ch({
+    id: 'm_lottery_after', queued: true, tier: 'major', cat: 'money', label: '로또', icon: '🧾', max: 1,
+    title: '그 많던 돈은 어디로', text: p => `통장 잔고가 ${M(Math.max(0, p.money))}원. 당첨 4년 만이다. 씀씀이는 이미 커져 있다.`,
+    choices: [
+      { id: 'reset', label: '정신 차리고 다시 일한다', intent: 'career', out: { t: '다시 이력서를 썼다. 돈보다 하루의 리듬이 그리웠다는 걸 알았다.', hp: 2, fn: p => { if (!p.job) LG.Outcome.setJob(p, 'office_small'); return ''; } } },
+      { id: 'more', label: '남은 돈으로 한 방을 노린다', intent: 'risk',
+        check: { base: 18, partial: 0, f: [['stat', 'intelligence', 0.2]] },
+        out: { success: { t: '투자가 터졌다. 운이 두 번 왔다.', money: 20000, hp: 10 }, fail: { t: '남은 돈마저 날렸다. 로또 당첨자의 흔한 결말이 내 이야기가 됐다.', log: '당첨금을 모두 잃음', major: true, hp: -20, sr: 20, fn: p => { p.money = Math.round(p.money * 0.1); return ''; } } } }
     ]
   });
 })(window.LG = window.LG || {});

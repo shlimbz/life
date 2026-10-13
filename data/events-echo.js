@@ -68,7 +68,7 @@
         out: {
           success: { t: '술 한잔 하며 옛날 얘기만 하고 돌아왔다. 다들 나이를 먹었다.', hp: 2, rel: { friends: 2 } },
           partial: { t: '"좋은 건"에 조금 넣었다가 고스란히 날렸다. 수업료라고 생각하기로 했다.', money: -500, hp: -4 },
-          fail: { t: '불법 도박판이었다. 정신을 차려 보니 빚이 생겨 있었다.', log: '옛 무리와 엮여 빚을 짐', debt: 1500, hp: -12, sr: 16, flag: 'gambling_debt' }
+          fail: { t: '불법 도박판이었다. 정신을 차려 보니 빚이 생겨 있었다.', log: '옛 무리와 엮여 빚을 짐', debt: 1500, debtKind: 'private', hp: -12, sr: 16, flag: 'gambling_debt' }
         } }
     ]
   });
@@ -106,7 +106,7 @@
         out: { success: { t: '공포 속에 산 주식이 몇 년 뒤 효자가 되었다.', log: '폭락장에서 과감히 매수', flag: 'buy_the_dip', hp: 8, fn: p => { const a = Math.min(Math.max(0, p.money), 1500); p.money -= a; p.inv.stock += Math.round(a * 1.5); return ''; } },
           partial: { t: '바닥인 줄 알았는데 지하실이 있었다. 그래도 길게 보기로 했다.', sr: 8 },
           fail: { t: '물타기가 물에 빠졌다. 손실이 두 배가 되었다.', hp: -10, sr: 14, fn: p => { p.inv.stock = Math.round(p.inv.stock * 0.75); return ''; } } } },
-      { id: 'sell', label: '더 떨어지기 전에 판다', intent: 'money', out: { t: '모두 팔고 나니 마음은 편했다. 몇 달 뒤 시장은 다시 올랐다.', flag: 'panic_sold', hp: -2, sr: -6, fn: p => { p.money += Math.round(p.inv.stock * 0.8 + p.inv.crypto * 0.7); p.inv.stock = 0; p.inv.crypto = 0; return ''; } } }
+      { id: 'sell', label: '더 떨어지기 전에 판다', intent: 'money', out: { t: '모두 팔고 나니 마음은 편했다. 몇 달 뒤 시장은 다시 올랐다.', flag: 'panic_sold', hp: 1, sr: -6, fn: p => { p.money += Math.round(p.inv.stock * 0.8 + p.inv.crypto * 0.7); p.inv.stock = 0; p.inv.crypto = 0; return ''; } } }
     ]
   });
 
@@ -212,7 +212,7 @@
       { id: 'surgery', label: '제대로 수술받는다', intent: 'health',
         check: { base: 60, partial: 0.4, f: [['health', 0.3], ['flag', 'healed', 8, '회복해 본 경험'], ['region', 'medical', 0.2]] },
         out: { success: { t: '수술과 재활 끝에 다시 걸음이 가벼워졌다.', flag: 'healed', money: -500, st: { health: 4 }, hp: 6 }, partial: { t: '조금 나아졌다. 완전하지는 않다.', money: -500, hp: 1 }, fail: { t: '수술 후에도 통증이 남았다.', money: -500, hp: -6, st: { health: -3 } } } },
-      { id: 'live', label: '달래 가며 산다', intent: 'stability', out: { t: '무리하지 않는 법을 배웠다. 아픈 날은 쉬어 간다.', hp: -1, st: { health: -1 } } }
+      { id: 'live', label: '달래 가며 산다', intent: 'stability', out: { t: '무리하지 않는 법을 배웠다. 아픈 날은 쉬어 간다.', hp: 0, st: { health: -1 } } }
     ]
   });
 

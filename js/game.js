@@ -21,6 +21,7 @@
       const push = (arr) => arr.forEach(l => {
         lines.push(l);
         LG.Timeline.add(p, l.t, l.reflect ? 'reflect' : l.major ? 'major' : 'minor', l.icon);
+        if (l.fx) p.history[p.history.length - 1].fx = l.fx;
       });
       push(LG.Life.yearly(p));
       push(LG.Style.yearly(p));

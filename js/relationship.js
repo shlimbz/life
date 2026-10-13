@@ -10,6 +10,8 @@
     partner: '연인', spouse: '배우자', child: '자녀', ex: '옛 연인', ex_spouse: '전 배우자'
   };
   const PARENT_ROLES = ['father', 'mother', 'grandparent'];
+  // 알림 카드에 보여 줄 변화 한 줄 (행복 -14 등)
+  const dl = (k, d) => ({ k, d, icon: { happy: '😊', stress: '😣' }[k], label: { happy: '행복', stress: '스트레스' }[k], text: (d > 0 ? '+' : '') + d, good: k === 'stress' ? d < 0 : d > 0 });
 
   const Rel = {
     PERSONALITIES, ROLE_LABEL,
@@ -138,7 +140,7 @@
       LG.State.flag(p, 'divorced');
       // 재산 분할
       p.money = Math.round(p.money * 0.55);
-      if (p.house) { p.money += Math.round((p.house.value - Math.min(p.debt, p.house.value)) * 0.5); p.debt = Math.max(0, p.debt - p.house.value); p.house = null; p.home = 'rent'; }
+      if (p.house) { const owe = LG.Loans.amount(p, 'mortgage'); LG.Loans.pay(p, Math.min(owe, p.house.value), ['mortgage']); p.money += Math.round(Math.max(0, p.house.value - owe) * 0.5); p.house = null; p.home = 'rent'; }
       Rel.adjust(p, 'children', -8);
       return sp;
     },
@@ -182,19 +184,20 @@
           n.alive = false; n.diedAt = p.age;
           const label = Rel.ROLE_LABEL[n.role] || '';
           if (PARENT_ROLES.indexOf(n.role) >= 0) {
-            lines.push({ t: `${label} ${n.name}님이 ${n.age}세로 세상을 떠나셨다.`, major: true, icon: '🕯️' });
+            lines.push({ t: `${label} ${n.name}님이 ${n.age}세로 세상을 떠나셨다.`, major: true, icon: '🕯️', card: { title: `${label}와의 이별`, icon: '🕯️', text: `${label} ${n.name}님이 ${n.age}세로 세상을 떠나셨다. 장례식장에서 사흘을 보냈다. 집에 돌아와서야 실감이 났다.`, deltas: [dl('happy', -14), dl('stress', 10)] }, fx: '행복 -14 · 스트레스 +10' });
             p.happy = U().clamp(p.happy - 14, 0, 100);
             p.stress = U().clamp(p.stress + 10, 0, 100);
             S.flag(p, 'parent_lost');
+            if (p.age < 19 && !Rel.parents(p).length) S.flag(p, 'young_carer');   // 부모를 모두 잃은 미성년 = 소년소녀가장
           } else if (n.role === 'spouse') {
-            lines.push({ t: `배우자 ${n.name}이(가) ${n.age}세로 먼저 세상을 떠났다.`, major: true, icon: '🕯️' });
+            lines.push({ t: `배우자 ${n.name}이(가) ${n.age}세로 먼저 세상을 떠났다.`, major: true, icon: '🕯️', card: { title: '배우자와의 이별', icon: '🕯️', text: `평생을 함께한 ${n.name.slice(1)}이(가) ${n.age}세로 먼저 떠났다. 집 안의 모든 물건이 그 사람을 기억한다.`, deltas: [dl('happy', -22)] }, fx: '행복 -22' });
             p.happy = U().clamp(p.happy - 22, 0, 100);
             S.flag(p, 'widowed'); S.unflag(p, 'married');
           } else if (n.role === 'sibling') {
-            lines.push({ t: `형제 ${n.name}을(를) 먼저 떠나보냈다.`, major: true, icon: '🕯️' });
+            lines.push({ t: `형제 ${n.name}을(를) 먼저 떠나보냈다.`, major: true, icon: '🕯️', fx: '행복 -10' });
             p.happy = U().clamp(p.happy - 10, 0, 100);
           } else if (n.role === 'child') {
-            lines.push({ t: `자녀 ${n.name}이(가) 먼저 세상을 떠났다.`, major: true, icon: '🕯️' });
+            lines.push({ t: `자녀 ${n.name}이(가) 먼저 세상을 떠났다.`, major: true, icon: '🕯️', card: { title: '자식을 먼저 보내다', icon: '🕯️', text: `${n.name}이(가) 먼저 세상을 떠났다. 세상에서 가장 무거운 슬픔이었다.`, deltas: [dl('happy', -25)] }, fx: '행복 -25' });
             p.happy = U().clamp(p.happy - 25, 0, 100);
           }
           // 상속: 부모 세대가 모두 떠났을 때
@@ -204,7 +207,7 @@
             const amt = Math.round(base * R().float(p, 0.6, 1.4) / (sib + 1) / 100) * 100;
             if (amt > 0) {
               p.money += amt; S.flag(p, 'inherited');
-              lines.push({ t: `부모님이 남기신 재산 ${U().money(amt)}원을 상속받았다.`, major: true, icon: '📜' });
+              lines.push({ t: `부모님이 남기신 재산 ${U().money(amt)}원을 상속받았다.`, major: true, icon: '📜', fx: `순자산 +${U().money(amt)}` });
             }
           }
         }
@@ -221,7 +224,7 @@
         pt.rel = U().clamp(pt.rel + d, 0, 100);
         if (pt.rel < 22) {
           Rel.breakup(p);
-          lines.push({ t: `${pt.name}와(과)의 관계가 점점 멀어지더니 결국 헤어졌다.`, major: true, icon: '💔' });
+          lines.push({ t: `${pt.name}와(과)의 관계가 점점 멀어지더니 결국 헤어졌다.`, major: true, icon: '💔', fx: '행복 -10' });
           p.happy = U().clamp(p.happy - 10, 0, 100);
         }
       }

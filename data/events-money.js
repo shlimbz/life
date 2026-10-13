@@ -5,7 +5,7 @@
   const H = LG.EH, has = H.has, seq = H.seq;
   const I = () => LG.Invest, U = () => LG.U, S = () => LG.State;
   const kids = H.kids;
-  const ORDER = ['cash', 'saver', 'balanced', 'growth', 'yolo'];
+  const ORDER = ['cash', 'saver', 'realty', 'balanced', 'growth', 'yolo'];
   const setPolicy = (key, text, flags) => p => {
     I().setPolicy(p, key);
     (flags || []).forEach(f => S().flag(p, f));
@@ -29,6 +29,8 @@
         out: { t: '', log: '예적금 위주로 자산관리 시작', hp: 3, sr: -3, flag: 'saved_early', fn: setPolicy('saver', '자동이체 적금부터 걸었다. 느리지만 마음이 편하다.') } },
       { id: 'balanced', label: '적립식 ETF·주식을 곁들여 균형 있게', intent: 'money',
         out: { t: '', log: '적립식 투자로 자산관리 시작', hp: 4, fn: setPolicy('balanced', '월급의 일부를 적립식 ETF로 자동 매수하도록 걸어 두었다.', ['investor']) } },
+      { id: 'realty', label: '리츠로 부동산에 조금씩 (월세처럼 배당)', intent: 'stability',
+        out: { t: '', log: '리츠·예적금으로 자산관리 시작', hp: 3, fn: setPolicy('realty', '건물을 통째로 살 순 없지만, 리츠로 건물 한 조각씩을 모으기 시작했다. 배당이 들어오면 월세 받는 기분이다.', ['investor']) } },
       { id: 'growth', label: '주식 중심으로 과감하게 (성장)', intent: 'risk',
         out: { t: '', log: '주식 중심의 성장 투자 시작', hp: 6, sr: 3, fn: setPolicy('growth', '증권 앱을 깔고 계좌를 만들었다. 숫자가 오르내릴 때마다 심장이 뛴다.', ['investor']) } },
       { id: 'yolo', label: '코인·주식에 크게 건다 (공격)', intent: 'risk',
@@ -155,10 +157,121 @@
   auto({ id: 'm_redevelop', cat: 'money', ages: [35, 78], w: 3, max: 1, icon: '🏗️',
     if: p => !!p.house,
     auto: { t: '동네에 재개발 소식이 돌더니 현실이 됐다. 집값이 껑충 뛰었다.', log: '재개발로 집값 상승', major: true, hp: 8, fn: p => { p.house.value = Math.round(p.house.value * 1.35); return ''; } } });
-  auto({ id: 'm_property_dip', cat: 'money', ages: [33, 75], w: 2, cd: 14, icon: '🏚️',
-    if: p => !!p.house && p.debt > 0,
-    auto: { t: '부동산 경기가 얼어붙었다. 호가가 쭉쭉 빠지는 걸 보니 대출 이자가 새삼 무겁다.', log: '집값 하락', hp: -5, sr: 8, fn: p => { p.house.value = Math.round(p.house.value * 0.84); return ''; } } });
+  // 침체기의 체감: 집값은 시장(LG.Invest)이 이미 움직였고, 여기서는 대출 이자의 무게를 느낀다
+  auto({ id: 'm_property_dip', cat: 'money', ages: [33, 75], w: 6, cd: 8, icon: '🏚️',
+    if: p => !!p.house && LG.Loans.amount(p, 'mortgage') > 0 && !!p.mkt && p.mkt.re === 'slump',
+    auto: { t: '부동산 경기가 얼어붙었다. 호가가 쭉쭉 빠지는 걸 보니 대출 이자가 새삼 무겁다.', log: '부동산 침체, 대출 이자 부담', hp: -4, sr: 6 } });
   auto({ id: 'm_bonus', cat: 'money', ages: [24, 58], w: 4, cd: 9, max: 3, icon: '🎁',
     if: p => !!p.job && LG.DATA.jobs[p.job.id].income >= 3000,
     auto: { t: p => LG.RNG.pick(p, ['성과급이 들어왔다. 뜻밖의 보너스에 입꼬리가 올라갔다.', '올해는 인센티브가 넉넉하게 나왔다. 가족과 외식을 했다.', '연말 정산에서 환급금이 꽤 들어왔다. 작은 횡재다.', '프로젝트 성공 보너스가 입금되었다. 고생이 보상받는 기분이다.']), hp: 4, fn: p => { p.money += Math.round(LG.Economy.salary(p) * 0.08 / 10) * 10; return ''; } } });
+
+  // 어린이 주식 계좌 — 요즘은 부모님이 미리 투자 습관을 길러 주기도 한다
+  E.push({
+    id: 'm_kid_account', cat: 'money', tier: 'choice', ages: [10, 17], w: p => 6 + (p.family.tier - 3) * 3, max: 1, icon: '📒',
+    if: p => p.family.tier >= 3 && p.family.ext >= 0 && !has(p, 'kid_investor'),
+    label: '용돈', title: '내 이름의 계좌', text: p => `{parent}가 내 이름으로 된 증권 계좌를 보여 주셨다. "세뱃돈이랑 용돈 모은 게 ${U().money(Math.max(0, p.money))}원이야. 이걸 어떻게 하고 싶니?"`,
+    choices: [
+      { id: 'stock', label: '우량주·ETF를 조금씩 사 모은다', intent: 'money',
+        out: { t: '매달 용돈의 절반으로 주식을 샀다. 친구들은 게임 아이템을 살 때 나는 주가 차트를 봤다.', log: '어린 나이에 주식 투자를 시작', flag: 'kid_investor', fn: p => { LG.Invest.setPolicy(p, 'growth', true); S().unflag(p, 'asset_start'); p.investSkill = (p.investSkill || 0) + 0.01; return ''; } } },
+      { id: 'save', label: '청약·적금 통장에 차곡차곡 넣는다', intent: 'stability',
+        out: { t: '청약 통장에 매달 2만 원씩 넣었다. 언젠가 내 집의 첫 벽돌이 될 거라고 했다.', flag: 'kid_investor', fn: p => { LG.Invest.setPolicy(p, 'saver', true); S().unflag(p, 'asset_start'); return ''; } } },
+      { id: 'spend', label: '사고 싶은 게 많다', intent: 'rest', out: { t: '새 운동화와 게임기를 샀다. 통장은 다시 비었지만 그해 겨울은 즐거웠다.', hp: 6, fn: p => { p.money = Math.round(p.money * 0.3); return ''; } } }
+    ]
+  });
+
+  // ───── 투자용 부동산: 오피스텔 월세 · 갭투자 아파트 · 리츠 ─────
+  const M = v => U().money(v);
+  const liquid = p => Math.max(0, p.money) + I().total(p);
+  const propPrice = (p, k) => Math.round(H.housePrice(p) * k / 100) * 100;
+  const buyProp = (kind) => p => {
+    const P = { officetel: { k: 0.3, down: 0.35, yld: 0.045, beta: 0.55, label: '오피스텔(월세)' }, gap: { k: 0.8, down: 0.22, yld: 0, beta: 1.3, label: '갭투자 아파트(전세 끼고)' } }[kind];
+    const price = propPrice(p, P.k);
+    const down = Math.round(price * P.down);
+    if (p.money < down) I().raise(p, down - p.money);
+    const cash = Math.min(Math.max(0, p.money), down);
+    p.money -= cash;
+    if (kind === 'gap') { LG.Loans.add(p, 'deposit', Math.round(price * 0.62)); LG.Loans.add(p, 'prop', price - cash - Math.round(price * 0.62)); }
+    else LG.Loans.add(p, 'prop', price - cash);
+    p.prop = { kind, label: P.label, value: price, bought: price, at: p.age, yield: P.yld, beta: P.beta };
+    S().flag(p, 'property_investor');
+    return kind === 'gap'
+      ? `${M(price)}원짜리 아파트를 세입자 전세금 ${M(Math.round(price * 0.62))}원을 끼고 샀다. 내 돈 ${M(cash)}원, 나머지는 대출이다. 집값이 오르면 크게 벌고, 내리면 크게 잃는다.`
+      : `${M(price)}원짜리 오피스텔을 샀다(내 돈 ${M(cash)}원, 대출 ${M(price - cash)}원). 월세가 들어오지만 시세는 잘 오르지 않는다.`;
+  };
+  E.push({
+    id: 'm_buy_prop', cat: 'money', tier: 'choice', ages: [30, 70], w: p => 9 + (p.mkt && p.mkt.re === 'boom' ? 5 : 0) + (H.A(p, 'money') >= 50 ? 4 : 0), cd: 6, max: 3, icon: '🏘️',
+    if: p => !p.prop && !!p.job && p.liveIn !== 'abroad' && liquid(p) >= propPrice(p, 0.3) * 0.35 && !has(p, 'delinquent') && LG.Loans.amount(p, 'private') === 0,
+    // 목돈이 넉넉히 모이면 한 번은 반드시 '부동산 투자' 갈림길을 만난다
+    milestone: p => !p.done.m_buy_prop && p.age >= 35 && p.age <= 62 && liquid(p) >= propPrice(p, 0.3) * 0.7, prio: 0,
+    label: '부동산 투자', title: '부동산에 투자할까',
+    text: p => `${S().liveRegion(p).short} 부동산은 ${I().RE_NAME[p.mkt.re]}. 지난해 시세는 ${p.reLast ? (p.reLast.ret >= 0 ? '+' : '') + p.reLast.ret + '%' : '보합'}. 모아 둔 돈(약 ${M(liquid(p))}원)으로 부동산에 투자해 볼까?`,
+    choices: [
+      { id: 'officetel', label: '오피스텔을 사서 월세를 받는다', intent: 'stability', out: { t: '', log: '오피스텔 투자', hp: 4, fn: buyProp('officetel') } },
+      { id: 'gap', label: '전세를 끼고 아파트를 산다 (갭투자)', intent: 'risk', if: p => liquid(p) >= propPrice(p, 0.8) * 0.22, out: { t: '', log: '갭투자로 아파트 매입', hp: 4, sr: 6, fn: buyProp('gap') } },
+      { id: 'reit', label: '소액으로 리츠(부동산 펀드)에 넣는다', intent: 'money', out: { t: '', log: '리츠 투자 시작', fn: p => { const amt = Math.round(Math.min(liquid(p) * 0.3, 5000) / 100) * 100; I().raise(p, Math.max(0, amt - p.money)); p.money -= amt; p.inv.reit = (p.inv.reit || 0) + amt; return `${M(amt)}원을 리츠에 넣었다. 건물주 대신 배당을 받는다.`; } } },
+      { id: 'no', label: '지금은 하지 않는다', intent: 'independence', out: { t: '부동산은 내 집 하나로 충분하다. 괜히 욕심내지 않기로 했다.' } }
+    ]
+  });
+  E.push({
+    id: 'm_sell_prop', cat: 'money', tier: 'choice', ages: [32, 90], w: p => { if (!p.prop) return 0; const g = p.prop.value / p.prop.bought - 1; return 6 + Math.abs(g) * 25; }, cd: 4, icon: '🏷️',
+    if: p => !!p.prop && p.age - p.prop.at >= 2,
+    // 크게 올랐거나 크게 빠졌을 때, 또는 노년에 정리할 때가 되면 '팔까' 갈림길이 온다
+    milestone: p => !!p.prop && (p.prop.value / p.prop.bought >= 1.4 || p.prop.value / p.prop.bought <= 0.8 || p.age >= 72), prio: 0,
+    label: '부동산 투자', title: p => p.prop && p.prop.value >= p.prop.bought ? '팔 때가 됐을까' : '손해를 보고라도 팔까',
+    text: p => { const pr = p.prop, g = Math.round((pr.value / pr.bought - 1) * 100); return `${pr.at}세에 ${M(pr.bought)}원에 산 ${pr.label}. 지금 시세는 ${M(pr.value)}원(${g >= 0 ? '+' : ''}${g}%). 시장은 ${I().RE_NAME[p.mkt.re]}이다.`; },
+    choices: [
+      { id: 'sell', label: '판다', intent: 'money', out: { t: '', log: p => '투자 부동산 매도', fn: p => {
+        const pr = p.prop, gain = pr.value - pr.bought;
+        const tax = gain > 0 ? Math.round(gain * (p.age - pr.at < 2 ? 0.5 : 0.22)) : 0;
+        const fee = Math.round(pr.value * 0.01);
+        // 판 돈으로 세입자 보증금과 투자 대출을 모두 정리한다. 모자라면 모아 둔 돈에서, 그래도 모자라면 신용대출로 남는다
+        let cash = pr.value - tax - fee;
+        cash -= LG.Loans.pay(p, LG.Loans.amount(p, 'deposit'), ['deposit']);
+        cash -= LG.Loans.pay(p, LG.Loans.amount(p, 'prop'), ['prop']);
+        p.money += cash;
+        if (p.money < 0) I().raise(p, -p.money);
+        if (p.money < 0) { LG.Loans.add(p, 'credit', -p.money); p.money = 0; }
+        p.prop = null;
+        S().addStat(p, 'happy', gain > 0 ? 6 : -4);
+        return gain > 0 ? `${M(gain)}원 시세차익(양도세 ${M(tax)}원)을 남기고 팔았다. 대출을 갚고 ${M(Math.max(0, cash))}원이 손에 남았다.` : `${M(-gain)}원 손해를 보고 팔았다. 그래도 더 떨어지기 전에 정리했다.`; } } },
+      { id: 'hold', label: '계속 들고 간다', intent: 'stability', out: { t: '부동산은 길게 보는 거라고 했다. 조금 더 기다려 보기로 했다.' } }
+    ]
+  });
+
+  // ───── 독촉: 신용대출·대부업은 연체되면 바로, 대부업은 연체가 없어도 자주 연락이 온다 ─────
+  const toRehab = cutRate => p => {
+    const L = LG.Loans, x = L.amount(p, 'private') + L.amount(p, 'credit');
+    if (!x) return '';
+    const cut = Math.round(x * cutRate);
+    const had = !!L.get(p, 'rehab');
+    L.pay(p, x, ['private', 'credit']); L.add(p, 'rehab', x - cut, { term: 8 });
+    if (!had) L.get(p, 'rehab').since = p.age;
+    S().flag(p, 'rehab'); S().unflag(p, 'delinquent');
+    return `원금 ${M(cut)}원을 감면받고, 남은 ${M(x - cut)}원은 8년 동안 벌이에 맞춰 나눠 갚는다.`;
+  };
+  H.toRehab = toRehab;
+  E.push({
+    id: 'm_collect', cat: 'crisis', tier: 'major', queued: true, icon: '📵',
+    cd: p => LG.Loans.amount(p, 'private') > 0 ? 1 : 2,
+    if: p => LG.Loans.amount(p, 'private') + LG.Loans.amount(p, 'credit') > 0,
+    label: '독촉', title: p => LG.Loans.amount(p, 'private') > 0 ? '대부업체의 전화' : '연체 독촉',
+    text: p => {
+      const pv = LG.Loans.amount(p, 'private'), cr = LG.Loans.amount(p, 'credit'), late = has(p, 'delinquent');
+      if (pv > 0) return late ? `대부업체 빚 ${M(pv)}원(연 19% 이상)의 상환일이 지났다. 아침부터 모르는 번호가 울리고, 직장에 연락하겠다는 문자까지 왔다.` : `대부업체 빚 ${M(pv)}원. 이자만 해도 한 해 ${M(Math.round(pv * 0.19))}원이다. "상환일 안내드립니다"라는 전화와 함께 추가 대출 권유가 온다.`;
+      return `카드론·신용대출 ${M(cr)}원의 상환이 밀렸다. 카드사에서 연체 안내 전화와 문자가 이어진다. 이대로면 신용점수가 떨어진다.`;
+    },
+    choices: [
+      { id: 'sell', label: '모아 둔 돈과 투자금을 털어 먼저 갚는다', intent: 'stability', if: p => Math.max(0, p.money) + I().total(p) >= 300,
+        out: { t: '', log: '비싼 빚부터 정리', sr: -6, hp: 3, fn: p => { const x = LG.Loans.amount(p, 'private') + LG.Loans.amount(p, 'credit'); I().raise(p, Math.max(0, x - p.money)); const paid = LG.Loans.pay(p, Math.min(Math.max(0, p.money), x), ['private', 'credit']); p.money -= paid; S().unflag(p, 'delinquent'); return paid >= x ? `${M(paid)}원을 한 번에 갚았다. 전화가 멈췄다.` : `${M(paid)}원을 갚았다. 아직 ${M(x - paid)}원이 남았다.`; } } },
+      { id: 'plan', label: '분할 상환 약속을 잡는다', intent: 'stability',
+        check: { base: 58, partial: 0.5, f: [['fn', p => p.job ? { label: '꾸준한 소득', v: 10 } : { label: '소득 없음', v: -14 }], ['stat', 'mental', 0.2]] },
+        out: { success: { t: '상환 일정을 다시 잡았다. 매달 정해진 날에만 갚으면 된다.', sr: -4, fn: p => { LG.Loans.init(p).forEach(l => { if (l.k === 'credit' || l.k === 'private') { l.late = 0; l.left = Math.max(l.left, 3); } }); S().unflag(p, 'delinquent'); return ''; } },
+          partial: { t: '일부만 조정됐다. 이자 부담은 그대로다.', sr: 4 },
+          fail: { t: '"이번 달 안에 못 갚으면 법적 절차에 들어갑니다." 통화가 끝나고 한참 손이 떨렸다.', sr: 10, hp: -6 } } },
+      { id: 'rehab', label: '신용회복위원회에 채무조정을 신청한다', intent: 'stability', if: p => has(p, 'delinquent') || LG.Loans.amount(p, 'private') > 0,
+        check: { base: 62, partial: 0, f: [['fn', p => p.job ? { label: '꾸준한 소득', v: 8 } : { label: '소득 없음', v: -8 }]] },
+        out: { success: { t: '', log: '채무조정 신청', hp: 4, sr: -12, fn: toRehab(0.3) }, fail: { t: '서류가 반려됐다. 다시 준비해야 한다.', sr: 8, hp: -4 } } },
+      { id: 'avoid', label: '전화를 받지 않는다', intent: 'rest', out: { t: '휴대폰을 무음으로 돌렸다. 하지만 이자는 무음이 안 된다.', log: '독촉 전화를 피함', hp: -6, sr: 12, fn: p => { LG.Loans.init(p).forEach(l => { if (l.k === 'private' || l.k === 'credit') { l.amt = Math.round(l.amt * 1.05); l.late = (l.late || 0) + 1; } }); LG.Loans.sync(p); p.queue.push({ id: 'm_collect', at: p.age + 1 }); return ''; } } }
+    ]
+  });
 })(window.LG = window.LG || {});

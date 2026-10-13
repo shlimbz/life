@@ -26,7 +26,7 @@
       { id: 'press', label: '부모님을 설득해 무리해서라도 이어 간다', intent: 'family',
         check: { base: 34, partial: 0.4, f: [['support', 0.3], ['family', 0.3], ['fn', p => ({ label: '재능의 등급', v: bonus[GR(p, star(p, COSTLY))] * 0.5 })]] },
         out: {
-          success: { t: '부모님이 허리띠를 졸라매고 레슨을 이어 주셨다. 그 마음이 무거우면서도 든든했다.', log: '집안의 희생으로 재능을 이어 감', major: true, flag: 'talent_funded', rel: { parents: 4 }, hp: 6, sr: 10, debt: 600, eff: { art: 8, sport: 8 } },
+          success: { t: '부모님이 허리띠를 졸라매고 레슨을 이어 주셨다. 그 마음이 무거우면서도 든든했다.', log: '집안의 희생으로 재능을 이어 감', major: true, flag: 'talent_funded', rel: { parents: 4 }, hp: 6, sr: 10, debt: 600, debtKind: 'family', eff: { art: 8, sport: 8 } },
           partial: { t: '레슨 횟수를 줄이고 독학으로 버텼다. 부족하지만 놓지는 않았다.', flag: 'talent_funded', eff: { art: 4, sport: 4 }, sr: 8, hp: 0 },
           fail: { t: '집안 사정이 갑자기 나빠졌다. "미안하다, 더는 못 해 준다"는 말 앞에서 아무 말도 하지 못했다.', log: '집안 사정으로 재능을 접음', major: true, sr: 14, hp: -10, fn: block() }
         } },

@@ -33,7 +33,9 @@
       return `✨ ${LG.DATA.talents[t].name}에 재능이 있다는 걸 알게 되었다.`;
     },
     friend: (rel, note) => p => { LG.Rel.addFriend(p, rel, note); return ''; },
-    lover: o => p => { LG.Rel.makeLoveInterest(p, o); LG.State.flag(p, 'dating'); return ''; },
+    // 새 연인 — 누구인지(나이·직업·성격) 한 줄로 분명히 남긴다 → 나중에 청혼이 와도 '이 사람이 누구지?'가 없게
+    lover: o => p => { const n = LG.Rel.makeLoveInterest(p, o); LG.State.flag(p, 'dating'); return H.loverLine(n); },
+    loverLine: n => n ? `(새 연인 ${n.name} · ${n.age}세 · ${n.job ? LG.DATA.jobs[n.job].name : '취업 준비 중'} · ${n.personality})` : '',
     seq: (...fns) => (p, ctx) => fns.map(f => f(p, ctx)).filter(x => typeof x === 'string' && x).join(' '),
     mulJob: m => p => { if (p.job) p.job.mul = Math.min(LG.Economy.maxMul(p.job.id, p), Math.round(p.job.mul * m * 1000) / 1000); return ''; },
     college: (years, kind) => p => { p.status = 'college'; p.college = { end: p.age + years, kind: kind || 'univ' }; if (LG.State.regionAttr(p, 'edu') < 70 && kind !== 'night') p.home = 'rent'; return ''; },
